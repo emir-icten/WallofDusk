@@ -2,44 +2,62 @@ using UnityEngine;
 
 public class DayNightController : MonoBehaviour
 {
-    [SerializeField] private float cycleLength = 240f; // Tam gün süresi (saniye)
-    [SerializeField, Range(0f,1f)] private float startTime = 0.25f; // 0=gece, 0.25=sabah, 0.5=öğlen, 0.75=akşam
-    [SerializeField] private Gradient sunColor;         // Işık rengi
-    [SerializeField] private AnimationCurve sunIntensity; // Işık şiddeti
+    [Header("References")]
+    public Transform sun;          // Güneş objesi
+    public Light sunLight;         // Güneş ışığı component
+    public Transform moon;         // Ay objesi (opsiyonel)
+    public Light moonLight;        // Ay ışığı (opsiyonel)
 
-    private Light sunLight;
-    private float time;
+    [Header("Lighting Settings")]
+    public float sunIntensityDay = 2f;   // Gündüz ışık yoğunluğunu artırdık
+    public float sunIntensityNight = 0f;
+    public float moonIntensityDay = 0f;  // gündüz ay ışığı kapalı
+    public float moonIntensityNight = 0.25f;
 
-    private void Start()
+    [Header("Skybox & Ambient")]
+    public Gradient skyColor;      // Skybox renkleri
+    public Gradient ambientColor;  // Ambient ışık renkleri
+    public Gradient fogColor;      // Fog renkleri
+
+    void Update()
     {
-        // Bu script SunLight objesinde olmalı
-        sunLight = GetComponent<Light>();
-        time = startTime;
-    }
+        if (TimeManager.Instance == null) return;
 
-    private void Update()
-    {
-        time += Time.deltaTime / cycleLength;
-        if (time > 1f) time = 0f;
+        // 0–1 arası normalize edilmiş zaman
+        float t = TimeManager.Instance.currentTime / 24f;
 
-        // Güneşin sahnede doğup batması (rotation)
-        float sunAngle = time * 360f;
-        sunLight.transform.rotation = Quaternion.Euler(sunAngle - 90f, 170f, 0);
+        // -------------------
+        // 1) Güneş ve Ay dönüşü
+        // -------------------
+        if (sun != null)
+            sun.localRotation = Quaternion.Euler((t * 360f) - 90f, 0f, 0f);  // Y rotasyonu 0 yapıldı, ışık sahneyi direkt aydınlatsın
+        if (moon != null)
+            moon.localRotation = Quaternion.Euler((t * 360f) + 90f, 0f, 0f);
 
-        // Renk ve yoğunluk
-        sunLight.color = sunColor.Evaluate(time);
-        sunLight.intensity = sunIntensity.Evaluate(time);
+        // -------------------
+        // 2) Işık yoğunluğu blend (doğal gün ışığı)
+        // -------------------
+        float daylight = Mathf.Clamp01(Mathf.Sin(t * Mathf.PI * 2f - Mathf.PI / 2f) * 0.5f + 0.5f);
+        float nightlight = 1f - daylight;
 
-        // Ambient (gece tamamen siyah olmaması için)
-        RenderSettings.ambientLight = Color.Lerp(
-            Color.black,
-            sunLight.color,
-            sunLight.intensity * 0.5f
-        );
-    }
+        if (sunLight != null)
+            sunLight.intensity = Mathf.Lerp(sunIntensityNight, sunIntensityDay, daylight);
+        if (moonLight != null)
+            moonLight.intensity = Mathf.Lerp(moonIntensityDay, moonIntensityNight, nightlight);
 
-    public float GetTime()
-    {
-        return time; // 0–1 arası normalize zaman
+        // -------------------
+        // 3) Skybox, ambient ve fog renkleri
+        // -------------------
+        if (skyColor != null && RenderSettings.skybox != null)
+        {
+            if (RenderSettings.skybox.HasProperty("_Tint"))
+                RenderSettings.skybox.SetColor("_Tint", skyColor.Evaluate(t));
+        }
+
+        if (ambientColor != null)
+            RenderSettings.ambientLight = ambientColor.Evaluate(t);
+
+        if (fogColor != null)
+            RenderSettings.fogColor = fogColor.Evaluate(t);
     }
 }
