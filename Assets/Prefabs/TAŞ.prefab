@@ -122,7 +122,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5c858b8ebad812148a72d41a432c067c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  resourceType: stone
+  resourceType: Stone
   resourceAmount: 5
   timeToChop: 3
   harvestRange: 2.5
