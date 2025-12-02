@@ -6,11 +6,11 @@ public class ResourceNode : MonoBehaviour
     public string resourceType = "Wood";
     public int totalResourceAmount = 40;
 
-    [Header("Görsel Ayarlar")]
-    public GameObject stumpPrefab;   // Kütük Prefabý
-    public GameObject lootUIPrefab;  // Uçan Resim Prefabý
+    [Header("GÃ¶rsel Ayarlar")]
+    public GameObject stumpPrefab;   // KÃ¼tÃ¼k PrefabÄ±
+    public GameObject lootUIPrefab;  // UÃ§an Resim PrefabÄ±
 
-    [Header("Kesme Ayarlarý")]
+    [Header("Kesme AyarlarÄ±")]
     public float timeToChop = 4f;
 
     private float resourcePerSecond;
@@ -21,51 +21,51 @@ public class ResourceNode : MonoBehaviour
 
     void Start()
     {
-        // Saniyede kaç tane verecek
+        // Saniyede kaÃ§ tane verecek
         if (timeToChop > 0)
             resourcePerSecond = totalResourceAmount / timeToChop;
         else
             resourcePerSecond = 1;
 
-        // Canvas'ý bul
+        // Canvas'Ä± bul
         mainCanvas = FindFirstObjectByType<Canvas>();
     }
 
     void Update()
     {
-        if (isHarvesting)
+        if (!isHarvesting) return;
+
+        currentChopTime += Time.deltaTime;
+        oneSecondTimer += Time.deltaTime;
+
+        // 1 saniye dolduysa PARÃ‡A FIRLAT
+        if (oneSecondTimer >= 1.0f)
         {
-            currentChopTime += Time.deltaTime;
-            oneSecondTimer += Time.deltaTime;
+            SpawnFlyingLoot();
+            oneSecondTimer = 0f;
+        }
 
-            // 1 saniye dolduysa PARÇA FIRLAT
-            if (oneSecondTimer >= 1.0f)
-            {
-                SpawnFlyingLoot();
-                oneSecondTimer = 0f;
-            }
-
-            // Ömür bitti mi?
-            if (currentChopTime >= timeToChop)
-            {
-                SpawnFlyingLoot(); // Son parçayý ver
-                SpawnStump();      // Kütüðü yarat
-                Destroy(gameObject); // Aðacý yok et
-            }
+        // Ã–mÃ¼r bitti mi?
+        if (currentChopTime >= timeToChop)
+        {
+            SpawnFlyingLoot(); // Son parÃ§ayÄ± ver
+            SpawnStump();      // KÃ¼tÃ¼ÄŸÃ¼ yarat
+            Destroy(gameObject); // AÄŸacÄ± yok et
         }
     }
 
-    // --- ANÝMASYONLU ÖDÜL ---
+    // --- ANÄ°MASYONLU Ã–DÃœL ---
     void SpawnFlyingLoot()
     {
-        // Eksik bir þey varsa hata vermesin, direkt puan versin
+        int amount = Mathf.RoundToInt(resourcePerSecond);
+
+        // Eksik bir ÅŸey varsa, direkt Ã¶dÃ¼l ver
         if (lootUIPrefab == null || mainCanvas == null || UIManager.instance == null)
         {
-            GiveRewardDirectly();
+            GiveRewardDirectly(amount);
             return;
         }
 
-        int amount = Mathf.RoundToInt(resourcePerSecond);
         Vector3 targetPos = Vector3.zero;
 
         // Hedefi belirle
@@ -73,37 +73,50 @@ public class ResourceNode : MonoBehaviour
             targetPos = UIManager.instance.woodText.transform.position;
         else if (resourceType == "Stone" && UIManager.instance.stoneText != null)
             targetPos = UIManager.instance.stoneText.transform.position;
+        else
+        {
+            // Hedef UI yoksa, doÄŸrudan Ã¶dÃ¼l ver
+            GiveRewardDirectly(amount);
+            return;
+        }
 
-        // Uçan objeyi yarat
+        // UÃ§an objeyi yarat
         GameObject lootObj = Instantiate(lootUIPrefab, mainCanvas.transform);
 
-        // Ekranda aðacýn olduðu yerde baþlat
+        // Ekranda aÄŸacÄ±n olduÄŸu yerde baÅŸlat
         Vector3 screenPos = Camera.main.WorldToScreenPoint(transform.position + Vector3.up * 2f);
         lootObj.transform.position = screenPos;
 
-        // Kuryeyi gönder (LootProjectile scripti lazým!)
+        // Kuryeyi gÃ¶nder (LootProjectile scripti lazÄ±msa)
         LootProjectile projectile = lootObj.GetComponent<LootProjectile>();
         if (projectile != null)
         {
             projectile.Setup(targetPos, amount, resourceType);
         }
+        else
+        {
+            // LootProjectile yoksa, direkt Ã¶dÃ¼l ver ve UI objesini Ã¶ldÃ¼r
+            GiveRewardDirectly(amount);
+            Destroy(lootObj);
+        }
     }
 
-    // --- YEDEK SÝSTEM (Eksik olan fonksiyon buydu) ---
-    void GiveRewardDirectly()
+    // --- YEDEK SÄ°STEM ---
+    void GiveRewardDirectly(int amount)
     {
-        int amount = Mathf.RoundToInt(resourcePerSecond);
+        if (amount <= 0) return;
+
         if (resourceType == "Wood")
         {
-            if (ResourceManager.instance != null) ResourceManager.AddWood(amount);
+            ResourceManager.AddWood(amount);
         }
         else if (resourceType == "Stone")
         {
-            if (ResourceManager.instance != null) ResourceManager.AddStone(amount);
+            ResourceManager.AddStone(amount);
         }
     }
 
-    // --- KÜTÜK SÝSTEMÝ (Bu da eksikti) ---
+    // --- KÃœTÃœK SÄ°STEMÄ° ---
     void SpawnStump()
     {
         if (stumpPrefab != null)
@@ -114,11 +127,13 @@ public class ResourceNode : MonoBehaviour
 
     void OnTriggerEnter(Collider other)
     {
-        if (other.CompareTag("Player")) isHarvesting = true;
+        if (other.CompareTag("Player"))
+            isHarvesting = true;
     }
 
     void OnTriggerExit(Collider other)
     {
-        if (other.CompareTag("Player")) isHarvesting = false;
+        if (other.CompareTag("Player"))
+            isHarvesting = false;
     }
 }
