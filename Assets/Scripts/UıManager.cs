@@ -1,39 +1,72 @@
 using UnityEngine;
-using TMPro; // TextMeshPro kütüphanesi þart
+using TMPro; // TextMeshPro kütüphanesi
 
 public class UIManager : MonoBehaviour
 {
     public static UIManager instance;
 
-    [Header("Arayüzdeki Yazýlar")]
+    [Header("Arayüzdeki Yazýlar (Otomatik Bulunur)")]
     public TextMeshProUGUI woodText;
     public TextMeshProUGUI stoneText;
     public TextMeshProUGUI coinText;
 
     void Awake()
     {
-        // Bu scripti herkesin ulaþabileceði "Tek Yetkili" yapýyoruz
+        // 1. Singleton (Tek Yetkili) Ayarý
         if (instance == null)
         {
             instance = this;
         }
+        else
+        {
+            Destroy(gameObject); // Eðer baþka bir tane varsa kendini yok et
+            return;
+        }
+
+        // 2. OTOMATÝK BAÐLANTI SÝSTEMÝ
+        // Kod diyor ki: "Sahneye git, ismi tam olarak 'WoodText' olan objeyi bul ve onu benim woodText deðiþkenime baðla."
+
+        if (woodText == null) // Eðer elle baðlanmamýþsa otomatik ara
+        {
+            GameObject foundObj = GameObject.Find("WoodText");
+            if (foundObj != null)
+                woodText = foundObj.GetComponent<TextMeshProUGUI>();
+            else
+                Debug.LogError("HATA: Sahnede 'WoodText' isminde bir obje bulunamadý!");
+        }
+
+        if (stoneText == null)
+        {
+            GameObject foundObj = GameObject.Find("StoneText");
+            if (foundObj != null)
+                stoneText = foundObj.GetComponent<TextMeshProUGUI>();
+            else
+                Debug.LogError("HATA: Sahnede 'StoneText' isminde bir obje bulunamadý!");
+        }
+
+        if (coinText == null)
+        {
+            GameObject foundObj = GameObject.Find("CoinText");
+            if (foundObj != null)
+                coinText = foundObj.GetComponent<TextMeshProUGUI>();
+            else
+                Debug.LogError("HATA: Sahnede 'CoinText' isminde bir obje bulunamadý!");
+        }
     }
 
-    // Odun yazýsýný günceller
+    // GÜNCELLEME FONKSÝYONLARI (Ayný Kalýyor)
     public void UpdateWoodUI(int currentAmount)
     {
-        woodText.text = currentAmount.ToString();
+        if (woodText != null) woodText.text = currentAmount.ToString();
     }
 
-    // Taþ yazýsýný günceller
     public void UpdateStoneUI(int currentAmount)
     {
-        stoneText.text = currentAmount.ToString();
+        if (stoneText != null) stoneText.text = currentAmount.ToString();
     }
 
-    // Coin yazýsýný günceller
     public void UpdateCoinUI(int currentAmount)
     {
-        coinText.text = currentAmount.ToString();
+        if (coinText != null) coinText.text = currentAmount.ToString();
     }
 }
