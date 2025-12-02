@@ -3,65 +3,112 @@ using UnityEngine;
 public class ResourceNode : MonoBehaviour
 {
     [Header("Kaynak Bilgisi")]
-    public string resourceType = "Wood";     // Wood veya Stone
-    public int totalResourceAmount = 40;     // Toplam kaynak
+    public string resourceType = "Wood";
+    public int totalResourceAmount = 40;
+
+    [Header("Görsel Ayarlar")]
+    public GameObject stumpPrefab;   // Kütük Prefabý
+    public GameObject lootUIPrefab;  // Uçan Resim Prefabý
 
     [Header("Kesme Ayarlarý")]
-    public float timeToChop = 4f;            // Kaç saniyede bitecek
+    public float timeToChop = 4f;
 
-    private float resourcePerSecond;         // Saniyede verilecek miktar
+    private float resourcePerSecond;
     private float currentChopTime = 0f;
     private float oneSecondTimer = 0f;
     private bool isHarvesting = false;
+    private Canvas mainCanvas;
 
     void Start()
     {
-        // Saniyede kaç tane vereceðini hesapla
+        // Saniyede kaç tane verecek
         if (timeToChop > 0)
             resourcePerSecond = totalResourceAmount / timeToChop;
         else
             resourcePerSecond = 1;
+
+        // Canvas'ý bul
+        mainCanvas = FindFirstObjectByType<Canvas>();
     }
 
     void Update()
     {
         if (isHarvesting)
         {
-            // Zamanlayýcýlarý çalýþtýr
             currentChopTime += Time.deltaTime;
             oneSecondTimer += Time.deltaTime;
 
-            // 1 Saniye dolduysa ödül ver
+            // 1 saniye dolduysa PARÇA FIRLAT
             if (oneSecondTimer >= 1.0f)
             {
-                GiveReward();
-                oneSecondTimer = 0f; // Saniyelik sayacý sýfýrla
+                SpawnFlyingLoot();
+                oneSecondTimer = 0f;
             }
 
-            // Aðacýn toplam ömrü bitti mi?
+            // Ömür bitti mi?
             if (currentChopTime >= timeToChop)
             {
-                GiveReward();
-                Destroy(gameObject); // Yok et
+                SpawnFlyingLoot(); // Son parçayý ver
+                SpawnStump();      // Kütüðü yarat
+                Destroy(gameObject); // Aðacý yok et
             }
         }
     }
 
-    void GiveReward()
+    // --- ANÝMASYONLU ÖDÜL ---
+    void SpawnFlyingLoot()
     {
-        // Miktarý hesapla
-        int amountToGive = Mathf.RoundToInt(resourcePerSecond);
+        // Eksik bir þey varsa hata vermesin, direkt puan versin
+        if (lootUIPrefab == null || mainCanvas == null || UIManager.instance == null)
+        {
+            GiveRewardDirectly();
+            return;
+        }
 
-        // Ýlgili kaynaðý ekle
+        int amount = Mathf.RoundToInt(resourcePerSecond);
+        Vector3 targetPos = Vector3.zero;
+
+        // Hedefi belirle
+        if (resourceType == "Wood" && UIManager.instance.woodText != null)
+            targetPos = UIManager.instance.woodText.transform.position;
+        else if (resourceType == "Stone" && UIManager.instance.stoneText != null)
+            targetPos = UIManager.instance.stoneText.transform.position;
+
+        // Uçan objeyi yarat
+        GameObject lootObj = Instantiate(lootUIPrefab, mainCanvas.transform);
+
+        // Ekranda aðacýn olduðu yerde baþlat
+        Vector3 screenPos = Camera.main.WorldToScreenPoint(transform.position + Vector3.up * 2f);
+        lootObj.transform.position = screenPos;
+
+        // Kuryeyi gönder (LootProjectile scripti lazým!)
+        LootProjectile projectile = lootObj.GetComponent<LootProjectile>();
+        if (projectile != null)
+        {
+            projectile.Setup(targetPos, amount, resourceType);
+        }
+    }
+
+    // --- YEDEK SÝSTEM (Eksik olan fonksiyon buydu) ---
+    void GiveRewardDirectly()
+    {
+        int amount = Mathf.RoundToInt(resourcePerSecond);
         if (resourceType == "Wood")
         {
-            if (ResourceManager.instance != null)
-                ResourceManager.AddWood(amountToGive);
+            if (ResourceManager.instance != null) ResourceManager.AddWood(amount);
         }
         else if (resourceType == "Stone")
         {
-            if (ResourceManager.instance != null)
-                ResourceManager.AddStone(amountToGive);
+            if (ResourceManager.instance != null) ResourceManager.AddStone(amount);
+        }
+    }
+
+    // --- KÜTÜK SÝSTEMÝ (Bu da eksikti) ---
+    void SpawnStump()
+    {
+        if (stumpPrefab != null)
+        {
+            Instantiate(stumpPrefab, transform.position, transform.rotation);
         }
     }
 

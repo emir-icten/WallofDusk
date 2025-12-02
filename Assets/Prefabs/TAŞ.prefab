@@ -124,6 +124,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   resourceType: Stone
   totalResourceAmount: 20
+  stumpPrefab: {fileID: 3924240756116203690, guid: 6e1620ff48f3240408ba82074c6fce11, type: 3}
+  lootUIPrefab: {fileID: 2225601234442345907, guid: a4d62ee74a7de5f408cad4f8ae98f47c, type: 3}
   timeToChop: 4
 --- !u!136 &3844236986414989324
 CapsuleCollider:
