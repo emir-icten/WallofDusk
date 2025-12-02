@@ -8,7 +8,7 @@ public class CameraFollow : MonoBehaviour
     public float smoothTime = 0.2f;
 
     [Header("Ölü Bölge (Dead Zone)")]
-    public float deadZoneRadius = 2f; // Çemberi biraz büyüttüm daha net hisset diye
+    public float deadZoneRadius = 2f;
 
     [Header("Görüþ Ayarlarý")]
     public float lookAheadDst = 3f;
@@ -22,6 +22,23 @@ public class CameraFollow : MonoBehaviour
 
     void Start()
     {
+        // --- 1. EKLENEN KISIM: OTOMATÝK BULMA ---
+        // Eðer target kutusu boþsa, sahnedeki 'Player' etiketli objeyi bulur.
+        if (target == null)
+        {
+            GameObject playerObj = GameObject.FindGameObjectWithTag("Player");
+            if (playerObj != null)
+            {
+                target = playerObj.transform;
+            }
+            else
+            {
+                Debug.LogError("HATA: Sahnede 'Player' tagine sahip bir obje bulunamadý! Kamera kimi takip edecek?");
+            }
+        }
+
+        // --- 2. SENÝN ORÝJÝNAL KODUN (Baþlangýç Ayarlarý) ---
+        // Target bulunduktan sonra offset ve focus hesaplanýr.
         if (target != null)
         {
             offset = transform.position - target.position;
@@ -46,12 +63,9 @@ public class CameraFollow : MonoBehaviour
                 focusPosition = target.position - (direction * deadZoneRadius);
             }
 
-            // --- 2. ÝLERÝ GÖRÜÞ (DÜZELTÝLEN KISIM) ---
-
+            // --- 2. ÝLERÝ GÖRÜÞ ---
             Vector3 targetLookAhead = Vector3.zero;
 
-            // DÝKKAT: Artýk Ýleri Görüþ, sadece çemberin DIÞINDAYSAK çalýþacak.
-            // Ýçindeyken 'targetLookAhead' sýfýr kalýr, yani kamera ekstra oynamaz.
             if (isOutsideDeadZone)
             {
                 float x = Input.GetAxisRaw("Horizontal");
