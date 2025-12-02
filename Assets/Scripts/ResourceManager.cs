@@ -4,26 +4,21 @@ public class ResourceManager : MonoBehaviour
 {
     public static ResourceManager instance;
 
-    // === PARA BÝRÝMLERÝ ===
-    public static int Coins = 0;
-    public static int Crystals = 0;
-
-    // === ENVANTER (HAMMADDE) ===
+    // === ENVANTER ===
     public static int WoodCount = 0;
     public static int StoneCount = 0;
+    public static int Coins = 0;
 
     void Awake()
     {
         if (instance == null) instance = this;
     }
 
-    // YENÝ EKLEME FONKSÝYONLARI:
+    // --- EKLEME FONKSÝYONLARI ---
     public static void AddWood(int amount)
     {
         WoodCount += amount;
-        Debug.Log("Odun eklendi! Toplam: " + WoodCount);
-
-        // Ekrana Haber Veriyoruz (KÖPRÜ)
+        // UIManager varsa ekraný güncelle
         if (UIManager.instance != null)
             UIManager.instance.UpdateWoodUI(WoodCount);
     }
@@ -31,9 +26,6 @@ public class ResourceManager : MonoBehaviour
     public static void AddStone(int amount)
     {
         StoneCount += amount;
-        Debug.Log("Taþ eklendi! Toplam: " + StoneCount);
-
-        // Ekrana Haber Veriyoruz (KÖPRÜ)
         if (UIManager.instance != null)
             UIManager.instance.UpdateStoneUI(StoneCount);
     }
@@ -41,15 +33,7 @@ public class ResourceManager : MonoBehaviour
     public static void AddCoin(int amount)
     {
         Coins += amount;
-        Debug.Log("Coin Eklendi. Toplam: " + Coins);
-
-        // Ekrana Haber Veriyoruz (KÖPRÜ)
         if (UIManager.instance != null)
             UIManager.instance.UpdateCoinUI(Coins);
-    }
-
-    public static void AddCrystals(int amount)
-    {
-        Crystals += amount;
     }
 }

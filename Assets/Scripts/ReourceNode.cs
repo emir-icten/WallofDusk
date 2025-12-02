@@ -3,80 +3,75 @@ using UnityEngine;
 public class ResourceNode : MonoBehaviour
 {
     [Header("Kaynak Bilgisi")]
-    public string resourceType = "Wood";
-    public int resourceAmount = 10; // Toplanacak toplam kaynak miktarý
+    public string resourceType = "Wood";     // Wood veya Stone
+    public int totalResourceAmount = 40;     // Toplam kaynak
 
     [Header("Kesme Ayarlarý")]
-    [Tooltip("Kaynak toplama süresi (saniye)")]
-    public float timeToChop = 3f;
+    public float timeToChop = 4f;            // Kaç saniyede bitecek
 
-    // Not: Bu range deðiþkenini kodda kullanmýyoruz çünkü SphereCollider kullanýyoruz, 
-    // ama inspector'da bilgi olarak kalmasýnda sakýnca yok.
-    public float harvestRange = 2.5f;
-
+    private float resourcePerSecond;         // Saniyede verilecek miktar
     private float currentChopTime = 0f;
+    private float oneSecondTimer = 0f;
     private bool isHarvesting = false;
+
+    void Start()
+    {
+        // Saniyede kaç tane vereceðini hesapla
+        if (timeToChop > 0)
+            resourcePerSecond = totalResourceAmount / timeToChop;
+        else
+            resourcePerSecond = 1;
+    }
 
     void Update()
     {
-        // Eðer toplama iþlemi baþladýysa
         if (isHarvesting)
         {
-            // Süreyi artýr (Kaldýðý yerden devam eder)
+            // Zamanlayýcýlarý çalýþtýr
             currentChopTime += Time.deltaTime;
+            oneSecondTimer += Time.deltaTime;
 
-            // Debug ile süreyi konsoldan takip edebilirsin (Ýsteðe baðlý)
-            // Debug.Log("Kesiliyor: " + currentChopTime);
+            // 1 Saniye dolduysa ödül ver
+            if (oneSecondTimer >= 1.0f)
+            {
+                GiveReward();
+                oneSecondTimer = 0f; // Saniyelik sayacý sýfýrla
+            }
 
-            // Zaman dolduysa
+            // Aðacýn toplam ömrü bitti mi?
             if (currentChopTime >= timeToChop)
             {
-                CollectResources();
-                Destroy(gameObject); // Kaynaðý yok et
-                isHarvesting = false;
+                GiveReward();
+                Destroy(gameObject); // Yok et
             }
         }
     }
 
-    // Karakter görünmez çembere (Sphere Collider) girdiðinde
-    void OnTriggerEnter(Collider other)
+    void GiveReward()
     {
-        if (other.CompareTag("Player"))
-        {
-            isHarvesting = true;
-            Debug.Log("Toplama Devam Ediyor: " + resourceType);
-        }
-    }
+        // Miktarý hesapla
+        int amountToGive = Mathf.RoundToInt(resourcePerSecond);
 
-    // Karakter görünmez çemberden çýktýðýnda
-    void OnTriggerExit(Collider other)
-    {
-        if (other.CompareTag("Player"))
-        {
-            isHarvesting = false;
-            // DÝKKAT: currentChopTime = 0f; kodunu SÝLDÝK.
-            // Artýk uzaklaþýnca süre sýfýrlanmýyor, olduðu yerde duruyor.
-
-            Debug.Log("Toplama Duraklatýldý! (Ýlerleme Korunuyor)");
-        }
-    }
-
-    void CollectResources()
-    {
-        // Toplanan kaynak tipine göre ilgili static fonksiyonu çaðýr
+        // Ýlgili kaynaðý ekle
         if (resourceType == "Wood")
         {
-            ResourceManager.AddWood(resourceAmount);
+            if (ResourceManager.instance != null)
+                ResourceManager.AddWood(amountToGive);
         }
         else if (resourceType == "Stone")
         {
-            ResourceManager.AddStone(resourceAmount);
+            if (ResourceManager.instance != null)
+                ResourceManager.AddStone(amountToGive);
         }
-        else
-        {
-            Debug.LogError("Bilinmeyen Kaynak Tipi: " + resourceType + " - Ýsmi kontrol ediniz.");
-        }
+    }
 
-        Debug.Log("Kaynak Baþarýyla Toplandý: " + resourceType);
+    void OnTriggerEnter(Collider other)
+    {
+        if (other.CompareTag("Player")) isHarvesting = true;
+    }
+
+    void OnTriggerExit(Collider other)
+    {
+        if (other.CompareTag("Player")) isHarvesting = false;
     }
 }
