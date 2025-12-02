@@ -174,6 +174,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   resourceType: Wood
-  resourceAmount: 5
+  resourceAmount: 40
   timeToChop: 3
   harvestRange: 2.5
