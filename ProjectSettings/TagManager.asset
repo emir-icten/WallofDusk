@@ -7,14 +7,15 @@ TagManager:
   - Enemy
   - Base
   - Building
+  - Ground
   layers:
   - Default
   - TransparentFX
   - Ignore Raycast
-  - 
+  - Ground
   - Water
   - UI
-  - 
+  - Building
   - 
   - 
   - 
