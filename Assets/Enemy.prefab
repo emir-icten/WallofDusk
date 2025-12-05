@@ -313,7 +313,7 @@ Transform:
   m_GameObject: {fileID: 8063749892153339535}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 5.9306626, y: 1, z: 5.3530726}
+  m_LocalPosition: {x: 1.3983154, y: 1.000061, z: -23.457458}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -438,7 +438,7 @@ MonoBehaviour:
   baseTarget: {fileID: 0}
   moveSpeed: 3
   stopDistance: 1.5
-  attackDamage: 5
+  attackDamage: 10
   attackInterval: 1.5
   attackRange: 2.5
   structureDetectRadius: 4
@@ -458,5 +458,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   maxHealth: 30
-  destroyOnDeath: 1
   currentHealth: 0
+  destroyOnDeath: 1
+  isBase: 0

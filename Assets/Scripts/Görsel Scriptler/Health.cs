@@ -2,14 +2,14 @@ using UnityEngine;
 
 public class Health : MonoBehaviour
 {
-    [Header("Health Ayarları")]
+    [Header("Can Ayarları")]
     public int maxHealth = 100;
-    public bool destroyOnDeath = false;   // Öldüğünde objeyi yok etsin mi?
+    [HideInInspector] public int currentHealth;
+    public bool destroyOnDeath = true;
 
-    //[HideInInspector]
-    public int currentHealth;
-
-    private bool isDead = false;
+    [Header("Özel Bayraklar")]
+    [Tooltip("Bu obje ölürse Game Over olsun (Base vs.)")]
+    public bool isBase = false;
 
     private void Awake()
     {
@@ -18,8 +18,7 @@ public class Health : MonoBehaviour
 
     public void TakeDamage(int amount)
     {
-        if (isDead) return;
-        if (amount <= 0) return;
+        if (currentHealth <= 0) return;
 
         currentHealth -= amount;
         if (currentHealth <= 0)
@@ -31,24 +30,21 @@ public class Health : MonoBehaviour
 
     public void Heal(int amount)
     {
-        if (isDead) return;
-        if (amount <= 0) return;
-
-        currentHealth += amount;
-        if (currentHealth > maxHealth)
-            currentHealth = maxHealth;
+        if (currentHealth <= 0) return;
+        currentHealth = Mathf.Min(maxHealth, currentHealth + amount);
     }
 
     private void Die()
     {
-        isDead = true;
+        Debug.Log($"{name} öldü. isBase = {isBase}");
 
-        // Burada isteğe göre ekstra şey yapabilirsin:
-        // - Enemy ise exp / coin ver
-        // - Base ise Game Over
-        // - Player ise "ölme animasyonu" + yeniden doğma
+        if (isBase && FlowUI.Instance != null)
+        {
+            Debug.Log("FlowUI.OnGameOver() çağrıldı");
+            FlowUI.Instance.OnGameOver();
+        }
 
-        if (destroyOnDeath)
+        if (destroyOnDeath && !isBase)
         {
             Destroy(gameObject);
         }
