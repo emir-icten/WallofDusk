@@ -285,12 +285,26 @@ public class EnemySpawner : MonoBehaviour
     }
 
     private void ClearEnemies()
+{
+    foreach (GameObject enemy in  aliveEnemies)
     {
-        foreach (GameObject enemy in aliveEnemies)
+        if (enemy == null) continue;
+
+        // Sabah olduğunda direkt Destroy yerine güneş yanığı başlat
+        EnemySunBurn burn = enemy.GetComponent<EnemySunBurn>();
+        if (burn != null)
         {
-            if (enemy != null)
-                Destroy(enemy);
+            burn.StartBurning();
         }
-        aliveEnemies.Clear();
+        else
+        {
+            // Her ihtimale karşı, script yoksa klasik Destroy
+            Destroy(enemy);
+        }
     }
+
+    // Spawner açısından bu düşmanları "artık saymıyoruz"
+     aliveEnemies.Clear();
+}
+
 }

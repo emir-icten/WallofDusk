@@ -21,6 +21,13 @@ public class BuildSystem : MonoBehaviour
 
         [Header("İnşa Süresi")]
         public float buildTime = 3f;       // saniye
+
+        [Header("Duvar Ayarları")]
+        public bool isWall = false;           // Bu yapı duvar mı?
+        [Tooltip("Duvar diğer duvarlara bu mesafeye kadar yaklaşıyorsa snap yapsın")]
+        public float wallSnapDistance = 1.5f;
+        [Tooltip("Duvar segmentlerinin merkezden merkeze uzunluğu")]
+        public float wallSegmentLength = 2f;
     }
 
     [Header("Yapılar")]
@@ -35,11 +42,15 @@ public class BuildSystem : MonoBehaviour
     public float minDistanceFromBase = 3f;
 
     [Header("Bina Mesafe Sınırı")]
-    [Tooltip("Kuleler / binalar birbirine ne kadar yakın olamaz?")]
+    [Tooltip("Kuleler / binalar birbirine ne kadar yakın olamaz? (Duvarlar için ayrıca kontrol var)")]
     public float minDistanceBetweenBuildings = 2f;
 
-    [Tooltip("Binaların bulunduğu layer mask (ArcherTower, MageTower, inşa alanı vs)")]
+    [Tooltip("Binaların bulunduğu layer mask (ArcherTower, MageTower, Wall, vs)")]
     public LayerMask buildingMask;
+
+    [Header("Duvar Global Ayarları")]
+    [Tooltip("Duvar prefablarının tag'i")]
+    public string wallTag = "Wall";
 
     [Header("Referanslar")]
     public PlayerBuilder playerBuilder;
@@ -51,9 +62,16 @@ public class BuildSystem : MonoBehaviour
     [Header("Zemin Dairesi (opsiyonel)")]
     public GameObject groundIndicatorPrefab;  // Yuvarlak daire prefab'ı
 
+    [Header("Rotation Ayarları")]
+    [Tooltip("R tuşuna her bastığında kaç derece döndürsün?")]
+    public float rotationStep = 90f;
+    public KeyCode rotateKey = KeyCode.R;
+
     // ---- internal state ----
     private Camera mainCam;
     private int selectedIndex = -1;
+    private BuildingConfig currentConfig;
+
     private GameObject currentGhost;
     private Renderer[] ghostRenderers;
 
@@ -63,6 +81,9 @@ public class BuildSystem : MonoBehaviour
     private Vector3 currentPlacementPos;
     private bool isPlacing = false;
     private bool lastValidState = true;
+
+    private float currentRotationY = 0f;
+    private Quaternion ghostBaseRotation;
 
     public bool IsPlacing => isPlacing;
 
@@ -98,6 +119,16 @@ public class BuildSystem : MonoBehaviour
         {
             CancelPlacement();
         }
+
+        // Döndür: R tuşu
+        if (Input.GetKeyDown(rotateKey))
+        {
+            currentRotationY += rotationStep;
+            if (currentRotationY >= 360f || currentRotationY <= -360f)
+                currentRotationY = Mathf.Repeat(currentRotationY, 360f);
+
+            UpdateGhostRotation();
+        }
     }
 
     // =========================================================
@@ -112,7 +143,7 @@ public class BuildSystem : MonoBehaviour
         }
 
         selectedIndex = index;
-        BuildingConfig cfg = buildings[selectedIndex];
+        currentConfig = buildings[selectedIndex];
 
         // Eski ghost'u temizle
         if (currentGhost != null)
@@ -129,13 +160,13 @@ public class BuildSystem : MonoBehaviour
         }
 
         // Yeni ghost oluştur
-        if (cfg.ghostPrefab != null)
+        if (currentConfig.ghostPrefab != null)
         {
-            currentGhost = Instantiate(cfg.ghostPrefab);
+            currentGhost = Instantiate(currentConfig.ghostPrefab);
         }
-        else if (cfg.finalPrefab != null)
+        else if (currentConfig.finalPrefab != null)
         {
-            currentGhost = Instantiate(cfg.finalPrefab);
+            currentGhost = Instantiate(currentConfig.finalPrefab);
         }
         else
         {
@@ -149,6 +180,11 @@ public class BuildSystem : MonoBehaviour
         ghostRenderers = currentGhost.GetComponentsInChildren<Renderer>();
         lastValidState = true;
 
+        // Rotation başlangıcı
+        ghostBaseRotation = currentGhost.transform.rotation;
+        currentRotationY = 0f;
+        UpdateGhostRotation();
+
         // Zemin dairesi varsa instantiate et
         if (groundIndicatorPrefab != null)
         {
@@ -159,7 +195,7 @@ public class BuildSystem : MonoBehaviour
         SetPlacementColor(validColor);
 
         isPlacing = true;
-        Debug.Log("BuildSystem: Placement moduna girildi -> " + cfg.displayName);
+        Debug.Log("BuildSystem: Placement moduna girildi -> " + currentConfig.displayName);
     }
 
     // =========================================================
@@ -179,6 +215,13 @@ public class BuildSystem : MonoBehaviour
         if (!hasHit) return;
 
         Vector3 pos = hit.point + Vector3.up * verticalOffset;
+
+        // Eğer seçili yapı duvar ise, yakın duvarlara göre snap etmeye çalış
+        if (currentConfig != null && currentConfig.isWall)
+        {
+            pos = GetSnappedWallPosition(pos, currentConfig);
+        }
+
         currentPlacementPos = pos;
 
         if (currentGhost != null)
@@ -225,9 +268,16 @@ public class BuildSystem : MonoBehaviour
         }
 
         Vector3 placementPos = hit.point + Vector3.up * verticalOffset;
+
+        // Duvar için snap tekrar
+        if (currentConfig != null && currentConfig.isWall)
+        {
+            placementPos = GetSnappedWallPosition(placementPos, currentConfig);
+        }
+
         currentPlacementPos = placementPos;
 
-        // 1) Pozisyon geçerli mi? (base + diğer kulelerden uzaklık kontrolü)
+        // 1) Pozisyon geçerli mi? (base + diğer binalardan uzaklık kontrolü)
         if (!IsValidPlacementPosition(placementPos))
         {
             Debug.Log("<BuildSystem> Geçersiz yer! (base'e veya başka kuleye çok yakın)");
@@ -251,6 +301,10 @@ public class BuildSystem : MonoBehaviour
         GameObject siteObj = new GameObject("ConstructionSite_" + cfg.displayName);
         siteObj.transform.position = placementPos;
 
+        // Rotasyonu ghost'tan al (özellikle duvarlar için önemli)
+        if (currentGhost != null)
+            siteObj.transform.rotation = currentGhost.transform.rotation;
+
         ConstructionSite site = siteObj.AddComponent<ConstructionSite>();
         site.Setup(cfg);
 
@@ -271,6 +325,7 @@ public class BuildSystem : MonoBehaviour
     {
         isPlacing = false;
         selectedIndex = -1;
+        currentConfig = null;
 
         if (!keepGhost && currentGhost != null)
         {
@@ -297,8 +352,103 @@ public class BuildSystem : MonoBehaviour
     }
 
     // ---------------------------
+    //  Duvar snap fonksiyonu (köşelerde tam otursun)
+    // ---------------------------
+    private Vector3 GetSnappedWallPosition(Vector3 pos, BuildingConfig cfg)
+    {
+        float radius = Mathf.Max(0.01f, cfg.wallSnapDistance);
+
+        // 1) Yakındaki duvarları bul
+        Collider[] hits;
+        if (buildingMask.value != 0)
+            hits = Physics.OverlapSphere(pos, radius, buildingMask);
+        else
+            hits = Physics.OverlapSphere(pos, radius);
+
+        Transform nearestWall = null;
+        float bestSqr = Mathf.Infinity;
+
+        foreach (var hit in hits)
+        {
+            if (hit == null) continue;
+            if (!hit.CompareTag(wallTag)) continue;
+
+            float sqr = (hit.transform.position - pos).sqrMagnitude;
+            if (sqr < bestSqr)
+            {
+                bestSqr = sqr;
+                nearestWall = hit.transform;
+            }
+        }
+
+        // Yakında hiç duvar yoksa, olduğu gibi bırak
+        if (nearestWall == null)
+            return pos;
+
+        Vector3 wallPos = nearestWall.position;
+
+        // Duvarın ileri yönü (uzun eksen)
+        Vector3 nF = nearestWall.forward;
+        nF.y = 0f;
+        if (nF.sqrMagnitude < 0.001f) nF = Vector3.forward;
+        nF.Normalize();
+
+        // Ghost duvarın yönü
+        if (currentGhost == null)
+            return pos;
+
+        Vector3 gF = currentGhost.transform.forward;
+        gF.y = 0f;
+        if (gF.sqrMagnitude < 0.001f) gF = Vector3.forward;
+        gF.Normalize();
+
+        // Mouse pozisyonuna göre hangi tarafa gittiğimizi bul
+        Vector3 toPos = pos - wallPos;
+        toPos.y = 0f;
+
+        float halfL = cfg.wallSegmentLength * 0.5f;
+
+        // İki duvar paralel mi, dik mi?
+        float dot = Mathf.Abs(Vector3.Dot(nF, gF));
+
+        Vector3 snappedPos;
+
+        if (dot > 0.9f)
+        {
+            // -----------------------------
+            // 1) PARALLEL: zincir gibi ard arda
+            // -----------------------------
+            float signAlong = Mathf.Sign(Vector3.Dot(toPos, nF));
+            if (Mathf.Approximately(signAlong, 0f)) signAlong = 1f;
+
+            snappedPos = wallPos + nF * signAlong * cfg.wallSegmentLength;
+            snappedPos.y = pos.y;
+        }
+        else
+        {
+            // -----------------------------
+            // 2) DİK: köşede tam birleşsin
+            // -----------------------------
+            float signN = Mathf.Sign(Vector3.Dot(toPos, nF));
+            if (Mathf.Approximately(signN, 0f)) signN = 1f;
+
+            float signG = Mathf.Sign(Vector3.Dot(toPos, gF));
+            if (Mathf.Approximately(signG, 0f)) signG = 1f;
+
+            // Eski duvarın ucundaki köşe
+            Vector3 corner = wallPos + nF * signN * halfL;
+
+            // Yeni duvarın merkezi = köşe + kendi yönünde yarım uzunluk
+            snappedPos = corner + gF * signG * halfL;
+            snappedPos.y = pos.y;
+        }
+
+        return snappedPos;
+    }
+
+    // ---------------------------
     //  Pozisyon geçerli mi?
-    //  (Base + diğer kulelerden mesafe kontrolü)
+    //  (Base + diğer binalardan mesafe kontrolü)
     // ---------------------------
     private bool IsValidPlacementPosition(Vector3 pos)
     {
@@ -315,22 +465,29 @@ public class BuildSystem : MonoBehaviour
             }
         }
 
-        // 2) Diğer kulelere / binalara çok yakın mı?
-        if (minDistanceBetweenBuildings > 0.01f)
-        {
-            Collider[] hits;
+        // 2) Diğer kule / binalara çok yakın mı?
+       // 2) Diğer kule / binalara çok yakın mı?
+// ⚠ Bu kuralı SADECE duvar olmayan yapılar için uygula.
+// Duvar inşa ederken kulelere yaklaşabilsin.
+if (minDistanceBetweenBuildings > 0.01f && (currentConfig == null || !currentConfig.isWall))
+{
+    Collider[] hits;
 
-            if (buildingMask.value != 0)
-                hits = Physics.OverlapSphere(pos, minDistanceBetweenBuildings, buildingMask);
-            else
-                hits = Physics.OverlapSphere(pos, minDistanceBetweenBuildings);
+    if (buildingMask.value != 0)
+        hits = Physics.OverlapSphere(pos, minDistanceBetweenBuildings, buildingMask);
+    else
+        hits = Physics.OverlapSphere(pos, minDistanceBetweenBuildings);
 
-            if (hits.Length > 0)
-            {
-                // etrafta başka bina var → buraya yeni bina koyma
-                return false;
-            }
-        }
+    foreach (var hit in hits)
+    {
+        if (hit == null) continue;
+
+        // Bu noktaya gelmişsek, zaten duvar inşa ETMİYORUZ demektir.
+        // Yani herhangi bir bina çok yakınsa: geçersiz.
+        return false;
+    }
+}
+
 
         return true;
     }
@@ -379,6 +536,14 @@ public class BuildSystem : MonoBehaviour
                 }
             }
         }
+    }
+
+    private void UpdateGhostRotation()
+    {
+        if (currentGhost == null) return;
+
+        currentGhost.transform.rotation =
+            ghostBaseRotation * Quaternion.Euler(0f, currentRotationY, 0f);
     }
 
     // ---------------------------

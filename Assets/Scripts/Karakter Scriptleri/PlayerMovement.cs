@@ -2,53 +2,78 @@ using UnityEngine;
 
 public class PlayerMovement : MonoBehaviour
 {
-    public float moveSpeed = 5f; // Karakter hızı
-    public Rigidbody rb; // Fizik motoru
+    [Header("Hareket")]
+    public float moveSpeed = 5f;
+    public Rigidbody rb;
 
-    Vector3 movement;
-    Vector3 camForward;
-    Vector3 camRight;
+    [Header("Giriş Kaynağı")]
+    public Joystick moveJoystick;   // 🎮 Mobil joystick (Canvas’taki joystiği buraya sürükle)
 
-    void Update()
+    private Transform cam;
+    private Vector3 inputDir;
+    private Vector3 moveDir;
+
+    private void Awake()
     {
-        // Klavyeden verileri al (WASD)
-        float moveX = Input.GetAxisRaw("Horizontal");
-        float moveZ = Input.GetAxisRaw("Vertical");
+        if (rb == null)
+            rb = GetComponent<Rigidbody>();
 
-        // Hareket verisini bir vektörde tut
-        movement = new Vector3(moveX, 0f, moveZ);
+        if (Camera.main != null)
+            cam = Camera.main.transform;
     }
 
-    void FixedUpdate()
+    private void Update()
     {
-        // Kameranın olduğu yerde olup olmadığını kontrol et (Hata almamak için)
-        if (Camera.main != null)
+        float moveX = 0f;
+        float moveZ = 0f;
+
+        // 1) Önce joystick’i dene (mobil)
+        if (moveJoystick != null && 
+            (Mathf.Abs(moveJoystick.Horizontal) > 0.01f || Mathf.Abs(moveJoystick.Vertical) > 0.01f))
         {
-            // 1. Kameranın baktığı yönleri al
-            camForward = Camera.main.transform.forward;
-            camRight = Camera.main.transform.right;
+            moveX = moveJoystick.Horizontal;
+            moveZ = moveJoystick.Vertical;
+        }
+        else
+        {
+            // 2) Joystick yoksa / kullanılmıyorsa klavye (PC test için)
+            moveX = Input.GetAxisRaw("Horizontal");
+            moveZ = Input.GetAxisRaw("Vertical");
+        }
 
-            // 2. Kameranın yere eğimini (Y eksenini) sıfırla. 
-            // Böylece karakter havaya uçmaya çalışmaz, yerde kalır.
-            camForward.y = 0;
-            camRight.y = 0;
+        inputDir = new Vector3(moveX, 0f, moveZ);
+        inputDir = Vector3.ClampMagnitude(inputDir, 1f);
 
-            // 3. Vektörleri düzelt (Normalize et)
+        // Kamera yönüne göre hareket (aynı eski mantığın)
+        if (cam != null)
+        {
+            Vector3 camForward = cam.forward;
+            camForward.y = 0f;
             camForward.Normalize();
+
+            Vector3 camRight = cam.right;
+            camRight.y = 0f;
             camRight.Normalize();
 
-            // 4. Gideceğimiz asıl yönü hesapla:
-            // (Kameranın ilerisi * W tuşu) + (Kameranın sağı * D tuşu)
-            Vector3 desiredMoveDirection = (camForward * movement.z) + (camRight * movement.x);
-
-            // 5. Karakteri hareket ettir
-            rb.MovePosition(rb.position + desiredMoveDirection * moveSpeed * Time.fixedDeltaTime);
-
-            // 6. Karakterin yüzünü gittiği yere döndür (Opsiyonel ama şık durur)
-            if (desiredMoveDirection != Vector3.zero)
-            {
-                transform.rotation = Quaternion.LookRotation(desiredMoveDirection);
-            }
+            moveDir = camForward * inputDir.z + camRight * inputDir.x;
         }
+        else
+        {
+            moveDir = inputDir;
+        }
+
+        // Yürürken oyuncuyu gittiği yöne döndür
+        if (moveDir.sqrMagnitude > 0.001f)
+        {
+            Quaternion targetRot = Quaternion.LookRotation(moveDir, Vector3.up);
+            transform.rotation = Quaternion.Slerp(transform.rotation, targetRot, 10f * Time.deltaTime);
+        }
+    }
+
+    private void FixedUpdate()
+    {
+        if (rb == null) return;
+
+        rb.MovePosition(rb.position + moveDir * moveSpeed * Time.fixedDeltaTime);
     }
 }

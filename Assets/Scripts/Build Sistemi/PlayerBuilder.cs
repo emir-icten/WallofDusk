@@ -74,8 +74,9 @@ public class PlayerBuilder : MonoBehaviour
             if (playerMovement != null)
                 playerMovement.enabled = true;
 
-            // İnşayı başlat
-            targetSite.BeginConstruction(this);
+            // ❗ İnşayı başlat (ARTIK PARAMETRE YOK)
+            targetSite.BeginConstruction();
+
             targetSite = null;
         }
     }
