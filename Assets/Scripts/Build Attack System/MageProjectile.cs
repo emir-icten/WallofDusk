@@ -13,22 +13,43 @@ public class MageProjectile : MonoBehaviour
     public LayerMask enemyMask;
 
     [Header("Efektler")]
-    public ParticleSystem impactEffect;   // Çarpma efekti (patlama)
+    public ParticleSystem impactEffect;   // Çarpma / patlama efekti
 
     private Vector3 moveDir;
     private bool hasExploded = false;
 
-    public void Init(Vector3 direction, int damageAmount, float radius, string targetTag, LayerMask enemyMask)
+    // Beni atan kule
+    private Transform owner;
+
+    private void OnEnable()
+    {
+        // Yeni spawn olan her projectile tertemiz başlasın
+        hasExploded = false;
+    }
+
+    /// <summary>
+    /// Kule bu füzeyi hazırlarken çağırıyor.
+    /// </summary>
+    public void Init(
+        Vector3 direction,
+        int damageAmount,
+        float radius,
+        string targetTag,
+        LayerMask enemyMask,
+        Transform owner
+    )
     {
         moveDir = direction.normalized;
         damage = damageAmount;
         explosionRadius = radius;
         this.targetTag = targetTag;
         this.enemyMask = enemyMask;
+        this.owner = owner;
     }
 
     private void Start()
     {
+        // Her ihtimale karşı belirli süreden sonra yok olsun
         Destroy(gameObject, lifeTime);
     }
 
@@ -43,13 +64,16 @@ public class MageProjectile : MonoBehaviour
     {
         if (hasExploded) return;
 
-        // Eğer hiçbir şeye çarpmadan sadece yere vurunca da patlasın istiyorsan,
-        // buradaki tag kontrolünü gevşek tutabiliriz.
-        if (!other.CompareTag(targetTag) && !other.CompareTag("Ground"))
+        // 1) KENDİ KULESİNE ÇARPARSA YOK SAY
+        if (owner != null &&
+            (other.transform == owner || other.transform.IsChildOf(owner)))
         {
-            // Duvar, ağaç vs ise de patlasın istiyorsan bu koşulu kaldırabilirsin.
-            // Şimdilik Enemy veya Ground olunca patlatıyoruz.
+            return;
         }
+
+        // 2) Şimdilik sadece hedef tag veya Ground olunca patlat
+        if (!other.CompareTag(targetTag) && !other.CompareTag("Ground"))
+            return;
 
         Explode();
     }
@@ -63,12 +87,14 @@ public class MageProjectile : MonoBehaviour
         {
             ParticleSystem fx = Instantiate(impactEffect, transform.position, Quaternion.identity);
             fx.Play();
-            Destroy(fx.gameObject, fx.main.duration + fx.main.startLifetime.constantMax);
+            Destroy(
+                fx.gameObject,
+                fx.main.duration + fx.main.startLifetime.constantMax
+            );
         }
 
         // Alan hasarı
         Collider[] hits;
-
         if (enemyMask.value != 0)
             hits = Physics.OverlapSphere(transform.position, explosionRadius, enemyMask);
         else

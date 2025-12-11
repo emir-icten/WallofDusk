@@ -13,16 +13,10 @@ public class FlowUI : MonoBehaviour
     public static FlowUI Instance { get; private set; }
 
     [Header("UI Panelleri")]
-    public GameObject mainMenuPanel;   // Başlangıç menüsü (Play)
-    public GameObject gameHudPanel;    // Oyun içi HUD
-    public GameObject gameOverPanel;   // Game Over ekranı
-
-    [Header("Sahneler")]
-    [Tooltip("Ana oyun sahnesinin adı (Build Settings'teki isim ile birebir aynı olmalı)")]
-    public string gameSceneName = "Zemin";   // senin sahnenin adı neyse onu yaz
-
-    [Header("Başlangıç Ayarı")]
-    public bool startInMainMenu = true;
+    public GameObject mainMenuPanel;        // Başlangıç menüsü (Play butonu)
+    public GameObject characterSelectPanel; // Play'den sonra açılacak panel
+    public GameObject gameHUDPanel;         // Oyun içi HUD (kaynaklar, butonlar)
+    public GameObject gameOverPanel;        // Game Over ekranı
 
     public GameState CurrentState { get; private set; } = GameState.MainMenu;
 
@@ -35,71 +29,95 @@ public class FlowUI : MonoBehaviour
         }
 
         Instance = this;
-        // Şimdilik sahneler arası taşımıyoruz:
+        // İstersen başka sahnelerde de kullanacaksan:
         // DontDestroyOnLoad(gameObject);
     }
 
     private void Start()
     {
-        if (startInMainMenu)
-            SetState(GameState.MainMenu);
-        else
-            SetState(GameState.Playing);
+        // Oyun açıldığında her şeyi temizce ayarla
+        SetState(GameState.MainMenu);
     }
 
-    private void SetState(GameState newState)
+    /// <summary>
+    /// Oyun durumunu değiştirip panelleri / Time.timeScale'i ayarlar.
+    /// </summary>
+    public void SetState(GameState newState)
     {
         CurrentState = newState;
-        Debug.Log("GameState -> " + newState);
 
-        switch (newState)
-        {
-            case GameState.MainMenu:
-                Time.timeScale = 0f;
-                if (mainMenuPanel) mainMenuPanel.SetActive(true);
-                if (gameHudPanel) gameHudPanel.SetActive(false);
-                if (gameOverPanel) gameOverPanel.SetActive(false);
-                break;
+        bool isMainMenu = newState == GameState.MainMenu;
+        bool isPlaying  = newState == GameState.Playing;
+        bool isGameOver = newState == GameState.GameOver;
 
-            case GameState.Playing:
-                Time.timeScale = 1f;
-                if (mainMenuPanel) mainMenuPanel.SetActive(false);
-                if (gameHudPanel) gameHudPanel.SetActive(true);
-                if (gameOverPanel) gameOverPanel.SetActive(false);
-                break;
+        if (mainMenuPanel != null)
+            mainMenuPanel.SetActive(isMainMenu);
 
-            case GameState.GameOver:
-                Time.timeScale = 0f;
-                if (mainMenuPanel) mainMenuPanel.SetActive(false);
-                if (gameHudPanel) gameHudPanel.SetActive(false);
-                if (gameOverPanel) gameOverPanel.SetActive(true);
-                break;
-        }
+        // Karakter seçimi sadece Play'e basınca açılacak,
+        // bu yüzden SetState içinde her zaman kapalı tutuyoruz.
+        if (characterSelectPanel != null)
+            characterSelectPanel.SetActive(false);
+
+        if (gameHUDPanel != null)
+            gameHUDPanel.SetActive(isPlaying);
+
+        if (gameOverPanel != null)
+            gameOverPanel.SetActive(isGameOver);
+
+        // Sadece Playing durumunda oyun akar, diğerlerinde durur
+        Time.timeScale = isPlaying ? 1f : 0f;
     }
 
-    // === UI BUTON FONKSİYONLARI ===
+    // ---------------- UI BUTONLARI ----------------
 
+    /// <summary>
+    /// Ana menüdeki Play butonu.
+    /// </summary>
     public void OnPlayButton()
     {
+        // Ana menüyü kapat, karakter seçme panelini aç.
+        if (mainMenuPanel != null)
+            mainMenuPanel.SetActive(false);
+
+        if (characterSelectPanel != null)
+            characterSelectPanel.SetActive(true);
+
+        // Seçim ekranında oyun akmasın
+        Time.timeScale = 0f;
+    }
+
+    /// <summary>
+    /// PlayerSelectionManager bir karakter seçtiğinde çağırır.
+    /// </summary>
+    public void OnCharacterSelected()
+    {
+        // Artık oyun başlasın
         SetState(GameState.Playing);
     }
 
+    /// <summary>
+    /// Base öldüğünde Health script'i burayı çağırıyor.
+    /// </summary>
     public void OnGameOver()
     {
-        if (CurrentState == GameState.GameOver) return;
+        Debug.Log("FlowUI: Game Over durumu alındı.");
         SetState(GameState.GameOver);
     }
 
-   public void OnRestartButton()
-{
-    Debug.Log("Restart pressed");
-    Time.timeScale = 1f;
+    /// <summary>
+    /// Game Over ekranındaki Restart butonu.
+    /// </summary>
+    public void OnRestartButton()
+    {
+        Debug.Log("Restart pressed");
+        Time.timeScale = 1f;
+        Scene current = SceneManager.GetActiveScene();
+        SceneManager.LoadScene(current.buildIndex);
+    }
 
-    // Aktif sahneyi BAŞTAN yükle
-    Scene current = SceneManager.GetActiveScene();
-    SceneManager.LoadScene(current.buildIndex);
-}
-
+    /// <summary>
+    /// İstersen Game Over veya Main Menu'de "Quit" butonuna bağla.
+    /// </summary>
     public void OnExitButton()
     {
         Debug.Log("Exit pressed");

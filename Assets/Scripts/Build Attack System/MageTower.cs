@@ -9,15 +9,15 @@ public class MageTower : MonoBehaviour
 
     [Header("Saldırı Ayarları")]
     public float attackInterval = 1.5f;
-    public int damagePerHit = 8;          // Okçuya göre biraz düşük
+    public int damagePerHit = 8;
     public float explosionRadius = 3f;
 
     [Header("Projectile Ayarları")]
-    public Transform shootPoint;          // Büyü topunun çıkacağı nokta
-    public GameObject magicProjectilePrefab;  // MageProjectile script'i olan prefab
+    public Transform shootPoint;                  // Büyü topunun çıkacağı nokta
+    public GameObject magicProjectilePrefab;      // MageProjectile script'i olan prefab
 
     [Header("Efektler (opsiyonel)")]
-    public ParticleSystem castEffect;     // Kuledeki "cast" efekti
+    public ParticleSystem castEffect;             // Kuledeki "cast" efekti
 
     private float attackTimer = 0f;
     private Transform currentTarget;
@@ -25,49 +25,63 @@ public class MageTower : MonoBehaviour
 
     private void Update()
     {
+        // Zaman sayacı
         attackTimer += Time.deltaTime;
 
-        // Geçersiz hedefi temizle
-        if (currentTargetHealth == null || currentTargetHealth.currentHealth <= 0)
-        {
-            currentTarget = null;
-            currentTargetHealth = null;
-        }
+        // 1) Hedef hâlâ geçerli mi?
+        CleanupTarget();
 
+        // 2) Hedef yoksa yenisini bul
         if (currentTarget == null)
         {
             FindTarget();
         }
 
-        if (currentTarget == null) return;
+        // 3) Hâlâ hedef yok → hiçbir şey yapma
+        if (currentTarget == null)
+            return;
 
-        Vector3 toTarget = currentTarget.position - transform.position;
-        float dist = toTarget.magnitude;
+        // 4) Hedef menzil içinde mi?
+        float dist = Vector3.Distance(transform.position, currentTarget.position);
 
-        // Hedef uzaklaştıysa bırak
-        if (dist > attackRange * 1.3f)
+        // Hedef menzil dışına çıktıysa hedefi sıfırla (bir sonraki frame'de tekrar aranacak)
+        if (dist > attackRange)
         {
             currentTarget = null;
             currentTargetHealth = null;
             return;
         }
 
-        // Kuleyi hedefe doğru döndür (isteğe bağlı)
-        toTarget.y = 0f;
-        if (toTarget.sqrMagnitude > 0.01f)
-        {
-            Quaternion lookRot = Quaternion.LookRotation(toTarget.normalized);
-            transform.rotation = Quaternion.Slerp(transform.rotation, lookRot, 10f * Time.deltaTime);
-        }
-
-        // Saldırı zamanı geldiyse projectile gönder
-        if (dist <= attackRange && attackTimer >= attackInterval)
+        // 5) Saldırı süresi dolduysa ateş et
+        if (attackTimer >= attackInterval)
         {
             ShootProjectile();
             attackTimer = 0f;
         }
     }
 
+    /// <summary>
+    /// Mevcut hedef ölmüş / yok olmuşsa temizler.
+    /// </summary>
+    private void CleanupTarget()
+    {
+        if (currentTargetHealth == null)
+        {
+            currentTarget = null;
+            currentTargetHealth = null;
+            return;
+        }
+
+        if (currentTargetHealth.currentHealth <= 0)
+        {
+            currentTarget = null;
+            currentTargetHealth = null;
+        }
+    }
+
+    /// <summary>
+    /// Menzil içinden en yakın düşmanı seçer.
+    /// </summary>
     private void FindTarget()
     {
         Collider[] hits;
@@ -83,10 +97,12 @@ public class MageTower : MonoBehaviour
 
         foreach (var hit in hits)
         {
-            if (!hit.CompareTag(enemyTag)) continue;
+            if (!hit.CompareTag(enemyTag))
+                continue;
 
             Health h = hit.GetComponent<Health>();
-            if (h == null || h.currentHealth <= 0) continue;
+            if (h == null || h.currentHealth <= 0)
+                continue;
 
             float sqr = (hit.transform.position - transform.position).sqrMagnitude;
             if (sqr < bestDistSqr)
@@ -99,36 +115,49 @@ public class MageTower : MonoBehaviour
 
         currentTarget = best;
         currentTargetHealth = bestHealth;
-    }
 
-    private void ShootProjectile()
-    {
-        if (shootPoint == null || magicProjectilePrefab == null || currentTarget == null)
-            return;
-
-        // Kule cast ederken küçük bir efekt oynat
-        if (castEffect != null)
-            castEffect.Play();
-
-        // Hedefin biraz göğüs hizasına nişan al
-        Vector3 targetPos = currentTarget.position + Vector3.up * 1f;
-        Vector3 dir = (targetPos - shootPoint.position).normalized;
-
-        Quaternion rot = Quaternion.LookRotation(dir);
-        GameObject projObj = Instantiate(magicProjectilePrefab, shootPoint.position, rot);
-
-        MageProjectile proj = projObj.GetComponent<MageProjectile>();
-        if (proj != null)
+        // Yeni hedef bulunduysa, yeni atış için sayacı sıfırla
+        if (currentTarget != null)
         {
-            proj.Init(
-                dir,
-                damagePerHit,
-                explosionRadius,
-                enemyTag,
-                enemyMask
-            );
+            attackTimer = 0f;
         }
     }
+
+    /// <summary>
+    /// Hedefe doğru bir büyü topu fırlatır.
+    /// </summary>
+   private void ShootProjectile()
+{
+    if (magicProjectilePrefab == null || currentTarget == null)
+        return;
+
+    // Çıkış noktası: varsa ShootPoint, yoksa kule merkezi
+    Vector3 spawnPos = shootPoint != null ? shootPoint.position : transform.position;
+
+    // Kule cast ederken küçük bir efekt oynat
+    if (castEffect != null)
+        castEffect.Play();
+
+    // Hedefin biraz göğüs hizasına nişan al
+    Vector3 targetPos = currentTarget.position + Vector3.up * 1f;
+    Vector3 dir = (targetPos - spawnPos).normalized;
+
+    Quaternion rot = Quaternion.LookRotation(dir);
+    GameObject projObj = Instantiate(magicProjectilePrefab, spawnPos, rot);
+
+    MageProjectile proj = projObj.GetComponent<MageProjectile>();
+    if (proj != null)
+    {
+        proj.Init(
+            dir,
+            damagePerHit,
+            explosionRadius,
+            enemyTag,
+            enemyMask,
+            transform          // beni atan kule
+        );
+    }
+}
 
     private void OnDrawGizmosSelected()
     {

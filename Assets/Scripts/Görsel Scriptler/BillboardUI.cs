@@ -10,13 +10,16 @@ public class BillboardUI : MonoBehaviour
             cam = Camera.main;
         if (cam == null) return;
 
-        // Kameraya bakacak şekilde döndür
-        Vector3 dir = transform.position - cam.transform.position;
-        dir.y = 0f;  // Dilersen dik kalması için Y'yi sabitlersin, istemezsen bu satırı sil
+        // Kameranın baktığı yönü al
+        Vector3 camForward = cam.transform.forward;
 
-        if (dir.sqrMagnitude > 0.0001f)
-        {
-            transform.rotation = Quaternion.LookRotation(dir);
-        }
+        // Y ekseninde dik kalsın, öne/arkaya eğilmesin
+        camForward.y = 0f;
+
+        if (camForward.sqrMagnitude < 0.0001f)
+            return;
+
+        // Tüm healthbarlar kameraya paralel, dik duracak şekilde döner
+        transform.rotation = Quaternion.LookRotation(camForward, Vector3.up);
     }
 }

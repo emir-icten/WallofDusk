@@ -1,17 +1,23 @@
 using UnityEngine;
 
+[RequireComponent(typeof(Rigidbody))]
 public class PlayerMovement : MonoBehaviour
 {
-    [Header("Hareket")]
+    [Header("Hareket Ayarları")]
     public float moveSpeed = 5f;
-    public Rigidbody rb;
+    public float rotationSpeed = 10f;
 
-    [Header("Giriş Kaynağı")]
-    public Joystick moveJoystick;   // 🎮 Mobil joystick (Canvas’taki joystiği buraya sürükle)
+    [Header("Joystick (isteğe bağlı)")]
+    public Joystick moveJoystick;          // Canvas'taki joystick'i buraya sürükle
 
-    private Transform cam;
-    private Vector3 inputDir;
-    private Vector3 moveDir;
+    [Header("Referanslar")]
+    public Rigidbody rb;                   // Root objenin Rigidbody'si
+
+    private Transform cam;                 // Ana kamera
+    private Animator animator;             // Karakterin Animator'u
+
+    private Vector3 moveDir;               // Dünya uzayında hareket yönü
+    private float baseY;                   // Karakterin sabit yükseklik değeri
 
     private void Awake()
     {
@@ -20,31 +26,72 @@ public class PlayerMovement : MonoBehaviour
 
         if (Camera.main != null)
             cam = Camera.main.transform;
+
+        animator = GetComponentInChildren<Animator>();
+
+        // Başlangıçtaki yüksekliği kaydet (zemine göre bir kere ayarlanmış olsun)
+        baseY = transform.position.y;
+
+        // Fiziksel gömülmeyi önlemek için Rigidbody ayarlarını güvene al
+        rb.useGravity = false; // Yerçekimi yok, yüksekliği biz kontrol edeceğiz
+        rb.constraints = RigidbodyConstraints.FreezeRotationX |
+                         RigidbodyConstraints.FreezeRotationZ;
+        // Yüksekliği ayrıca kodda sabitlediğimiz için PositionY'yi burada dondurmak şart değil
+        // ama istersen şu satırı da ekleyebilirsin:
+        // rb.constraints |= RigidbodyConstraints.FreezePositionY;
     }
 
     private void Update()
     {
-        float moveX = 0f;
-        float moveZ = 0f;
+        HandleInput();
+        HandleRotation();
+        UpdateAnimator();
+    }
 
-        // 1) Önce joystick’i dene (mobil)
-        if (moveJoystick != null && 
-            (Mathf.Abs(moveJoystick.Horizontal) > 0.01f || Mathf.Abs(moveJoystick.Vertical) > 0.01f))
+    private void FixedUpdate()
+    {
+        if (rb == null) return;
+
+        // Sadece XZ düzleminde hareket et
+        Vector3 newPos = rb.position + moveDir * moveSpeed * Time.fixedDeltaTime;
+
+        // Yüksekliği her frame sabitle: asla zemine gömülmesin
+        newPos.y = baseY;
+
+        rb.MovePosition(newPos);
+    }
+
+    /// <summary>
+    /// Joystick + klavye girişlerinden hareket vektörünü hesaplar.
+    /// </summary>
+    private void HandleInput()
+    {
+        float inputX = 0f;
+        float inputZ = 0f;
+
+        // Joystick aktif mi? (mobil)
+        bool joystickActive =
+            moveJoystick != null &&
+            (Mathf.Abs(moveJoystick.Horizontal) > 0.05f ||
+             Mathf.Abs(moveJoystick.Vertical) > 0.05f);
+
+        if (joystickActive)
         {
-            moveX = moveJoystick.Horizontal;
-            moveZ = moveJoystick.Vertical;
+            inputX = moveJoystick.Horizontal;
+            inputZ = moveJoystick.Vertical;
         }
         else
         {
-            // 2) Joystick yoksa / kullanılmıyorsa klavye (PC test için)
-            moveX = Input.GetAxisRaw("Horizontal");
-            moveZ = Input.GetAxisRaw("Vertical");
+            // PC testleri için WASD / ok tuşları
+            inputX = Input.GetAxisRaw("Horizontal");
+            inputZ = Input.GetAxisRaw("Vertical");
         }
 
-        inputDir = new Vector3(moveX, 0f, moveZ);
+        // Yerel giriş vektörü
+        Vector3 inputDir = new Vector3(inputX, 0f, inputZ);
         inputDir = Vector3.ClampMagnitude(inputDir, 1f);
 
-        // Kamera yönüne göre hareket (aynı eski mantığın)
+        // Kamera yönüne göre dünya uzayına çevir
         if (cam != null)
         {
             Vector3 camForward = cam.forward;
@@ -61,19 +108,35 @@ public class PlayerMovement : MonoBehaviour
         {
             moveDir = inputDir;
         }
+    }
 
-        // Yürürken oyuncuyu gittiği yöne döndür
-        if (moveDir.sqrMagnitude > 0.001f)
+    /// <summary>
+    /// Karakteri yürüdüğü yöne doğru döndürür.
+    /// </summary>
+    private void HandleRotation()
+    {
+        Vector3 flatDir = moveDir;
+        flatDir.y = 0f;
+
+        if (flatDir.sqrMagnitude > 0.001f)
         {
-            Quaternion targetRot = Quaternion.LookRotation(moveDir, Vector3.up);
-            transform.rotation = Quaternion.Slerp(transform.rotation, targetRot, 10f * Time.deltaTime);
+            Quaternion targetRot = Quaternion.LookRotation(flatDir, Vector3.up);
+            transform.rotation = Quaternion.Slerp(
+                transform.rotation,
+                targetRot,
+                rotationSpeed * Time.deltaTime
+            );
         }
     }
 
-    private void FixedUpdate()
+    /// <summary>
+    /// Animator'daki "Speed" parametresini günceller (Idle / Run geçişleri için).
+    /// </summary>
+    private void UpdateAnimator()
     {
-        if (rb == null) return;
+        if (animator == null) return;
 
-        rb.MovePosition(rb.position + moveDir * moveSpeed * Time.fixedDeltaTime);
+        float speed = new Vector3(moveDir.x, 0f, moveDir.z).magnitude;
+        animator.SetFloat("Speed", speed);
     }
 }

@@ -50,13 +50,7 @@ public class ArcherTower : MonoBehaviour
             return;
         }
 
-        // Kuleyi hedefe doğru bakacak şekilde döndür (isteğe bağlı)
-        toTarget.y = 0f;
-        if (toTarget.sqrMagnitude > 0.01f)
-        {
-            Quaternion lookRot = Quaternion.LookRotation(toTarget.normalized);
-            transform.rotation = Quaternion.Slerp(transform.rotation, lookRot, 10f * Time.deltaTime);
-        }
+       
 
         // Menzil içindeyse ve ateş süresi dolduysa ok gönder
         if (dist <= attackRange && fireTimer >= fireInterval)

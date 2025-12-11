@@ -55,6 +55,23 @@ public class BuildSystem : MonoBehaviour
     [Header("Referanslar")]
     public PlayerBuilder playerBuilder;
 
+        /// <summary>
+    /// Aktif player değiştiğinde çağırılır.
+    /// </summary>
+    public void SetPlayerBuilder(PlayerBuilder newBuilder)
+    {
+        playerBuilder = newBuilder;
+        if (playerBuilder != null)
+        {
+            Debug.Log("BuildSystem: PlayerBuilder güncellendi -> " + playerBuilder.name);
+        }
+        else
+        {
+            Debug.Log("BuildSystem: PlayerBuilder NULL oldu.");
+        }
+    } 
+    
+    
     [Header("Ghost & Zemin Uyarı Renkleri")]
     public Color validColor = new Color(0.5f, 1f, 0.5f, 1f);   // geçerli yer
     public Color invalidColor = new Color(1f, 0.4f, 0.4f, 1f); // geçersiz yer
