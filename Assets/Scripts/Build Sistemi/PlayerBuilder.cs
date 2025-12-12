@@ -1,41 +1,34 @@
 using UnityEngine;
 
+[RequireComponent(typeof(CharacterController))]
 public class PlayerBuilder : MonoBehaviour
 {
     [Header("Hareket Ayarları")]
     public float moveSpeed = 5f;
-    public float stopDistance = 1.5f;   // İnşa alanına bu kadar yaklaşınca dur
+    public float stopDistance = 1.5f;
 
     [Header("İnşa Ayarları")]
-    public float buildRange = 2f;       // Şimdilik sadece mesafe kontrolü için
+    public float buildRange = 2f; // şimdilik sadece mesafe kontrolü
 
     private ConstructionSite targetSite;
-    private bool isMovingToBuild = false;
+    private bool isMovingToBuild;
 
-    // Senin var olan hareket scriptin
-    private PlayerMovement playerMovement;
-    private Rigidbody rb;
+    private PlayerMovementCC playerMovement;     // senin yeni movement scriptin
+    private CharacterController cc;
+    private Animator animator;
 
-    private void Awake()
+    void Awake()
     {
-        // Aynı objede bulunan PlayerMovement ve Rigidbody'yi yakala
-        playerMovement = GetComponent<PlayerMovement>();
-
-        if (playerMovement != null && playerMovement.rb != null)
-        {
-            rb = playerMovement.rb;
-        }
-        else
-        {
-            rb = GetComponent<Rigidbody>();
-        }
+        cc = GetComponent<CharacterController>();
+        playerMovement = GetComponent<PlayerMovementCC>();   // ❗ eski PlayerMovement değil
+        animator = GetComponentInChildren<Animator>();
     }
 
-    private void Update()
+    void Update()
     {
-        if (!isMovingToBuild || targetSite == null)
-            return;
+        if (!isMovingToBuild || targetSite == null) return;
 
+        // Y düzlemini sabitle (top-down gibi)
         Vector3 targetPos = targetSite.transform.position;
         targetPos.y = transform.position.y;
 
@@ -43,51 +36,55 @@ public class PlayerBuilder : MonoBehaviour
 
         if (dist > stopDistance)
         {
-            // PlayerMovement'i biz kontrol edeceğimiz için kapat
+            // Normal kontrol kapansın
             if (playerMovement != null && playerMovement.enabled)
                 playerMovement.enabled = false;
 
-            // Hedefe doğru yürü
-            Vector3 dir = (targetPos - transform.position).normalized;
+            Vector3 dir = (targetPos - transform.position);
+            dir.y = 0f;
 
-            if (rb != null)
+            if (dir.sqrMagnitude > 0.0001f)
             {
-                rb.MovePosition(rb.position + dir * moveSpeed * Time.deltaTime);
-            }
-            else
-            {
-                transform.position += dir * moveSpeed * Time.deltaTime;
-            }
+                dir.Normalize();
 
-            // Karakter yüzünü gittiği yöne çevir
-            if (dir != Vector3.zero)
-            {
-                transform.rotation = Quaternion.LookRotation(dir);
+                // CharacterController ile güvenli hareket
+                cc.Move(dir * moveSpeed * Time.deltaTime);
+
+                // Yöne dön
+                transform.rotation = Quaternion.Slerp(
+                    transform.rotation,
+                    Quaternion.LookRotation(dir),
+                    12f * Time.deltaTime
+                );
+
+                // Anim (opsiyonel)
+                if (animator != null)
+                    animator.SetFloat("Speed", 1f);
             }
         }
         else
         {
-            // Hedefe vardık
+            // Vardık
             isMovingToBuild = false;
 
-            // Normal kontrolü geri ver
+            // Anim (opsiyonel)
+            if (animator != null)
+                animator.SetFloat("Speed", 0f);
+
+            // Kontrolü geri ver
             if (playerMovement != null)
                 playerMovement.enabled = true;
 
-            // ❗ İnşayı başlat (ARTIK PARAMETRE YOK)
+            // İnşayı başlat
             targetSite.BeginConstruction();
 
             targetSite = null;
         }
     }
 
-    /// <summary>
-    /// BuildSystem burayı çağırıyor: "Git şu inşa alanını yap".
-    /// </summary>
     public void GoBuild(ConstructionSite site)
     {
         if (site == null) return;
-
         targetSite = site;
         isMovingToBuild = true;
     }

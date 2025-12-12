@@ -4,75 +4,148 @@ public class PlayerArcher : MonoBehaviour
 {
     [Header("Ok Ayarları")]
     public GameObject arrowPrefab;
-    public Transform shootPoint;     // Okun çıkacağı nokta
-    public float attackRange = 15f;  // Hedef arama yarıçapı
-    public float fireRate = 0.7f;    // Atışlar arası süre (saniye)
+    public Transform shootPoint;
+    public float attackRange = 15f;
+    public float fireRate = 0.25f;
 
-    [Header("Hedefe Bakma")]
+    [Header("Animasyon")]
+    public Animator animator;
+    public string drawTrigger = "Draw";
+    public string shootTrigger = "Shoot";
+
+    [Tooltip("DrawBow klibinin süresi kadar. İlk atış bundan sonra başlar.")]
+    public float drawDuration = 0.35f;
+
+    [Header("Üst Gövde Aim (BlendTree)")]
+    public string aimParam = "Aim";      // Float param (BlendTree 1D)
+    public float aimAngleMax = 60f;      // 60 derece = Aim +-1
+    public float aimSmooth = 10f;        // Yumuşatma hızı
+
+    [Header("Hedefe Bakma (Root Dönüş)")]
     public bool rotateTowardsTarget = true;
     public float rotateSpeed = 10f;
 
     [Header("Görüş Hattı Ayarı")]
-    [Tooltip("Raycast hedefin neresine doğru atılsın? (0 = ayak, 1 = kafa)")]
     [Range(0f, 2f)] public float targetHeightOffset = 1.5f;
 
     private float nextFireTime = 0f;
+    private bool hadTarget = false;
 
-    private void Update()
+    private float aimValue = 0f;
+
+    void Awake()
+    {
+        if (animator == null)
+            animator = GetComponentInChildren<Animator>();
+    }
+
+    void Update()
     {
         if (arrowPrefab == null || shootPoint == null)
         {
             Debug.LogWarning("PlayerArcher: arrowPrefab veya shootPoint atanmadı!", this);
+            SetAim(0f);
+            hadTarget = false;
             return;
         }
 
-        // En düşük can yüzdesine sahip, GÖRÜLEBİLEN düşmanı bul
         Transform target = FindLowestHealthVisibleEnemyInRange();
-        if (target == null)
+        bool hasTarget = target != null;
+
+        // Hedef yoksa: aim sıfırla, state resetle
+        if (!hasTarget)
         {
-            return; // Menzilde, görünen uygun hedef yok
+            hadTarget = false;
+            SetAim(0f);
+            return;
         }
 
-        // Debug çizgi
-        Debug.DrawLine(shootPoint.position, target.position + Vector3.up * targetHeightOffset, Color.red);
+        // Üst gövde aim (hedef sağ/sol)
+        UpdateAimTowards(target);
 
-        // Hedefe dön
-        Vector3 dir = target.position - transform.position;
-        dir.y = 0f;
+        // Root dönüş (istersen kapatabilirsin, sadece üst gövdeyle de olur)
+        if (rotateTowardsTarget)
+            RotateRootTowards(target);
 
-        if (rotateTowardsTarget && dir.sqrMagnitude > 0.001f)
+        // İlk kez hedef gördüysek: Draw 1 kere
+        if (!hadTarget)
         {
-            Quaternion lookRot = Quaternion.LookRotation(dir.normalized, Vector3.up);
-            transform.rotation = Quaternion.Slerp(transform.rotation, lookRot, rotateSpeed * Time.deltaTime);
+            hadTarget = true;
+
+            if (animator != null)
+            {
+                animator.ResetTrigger(drawTrigger);
+                animator.SetTrigger(drawTrigger);
+            }
+
+            nextFireTime = Time.time + drawDuration;
+            return;
         }
 
-        // Atış cooldown
+        // Seri atış
         if (Time.time >= nextFireTime)
         {
+            if (animator != null)
+            {
+                animator.ResetTrigger(shootTrigger);
+                animator.SetTrigger(shootTrigger);
+            }
+
             ShootAt(target);
             nextFireTime = Time.time + fireRate;
         }
     }
 
-    private void ShootAt(Transform target)
+    void UpdateAimTowards(Transform target)
+    {
+        Vector3 toTarget = target.position - transform.position;
+        toTarget.y = 0f;
+
+        if (toTarget.sqrMagnitude < 0.0001f)
+        {
+            SetAim(0f);
+            return;
+        }
+
+        float signedAngle = Vector3.SignedAngle(transform.forward, toTarget.normalized, Vector3.up);
+        float targetAim = Mathf.Clamp(signedAngle / aimAngleMax, -1f, 1f);
+
+        aimValue = Mathf.Lerp(aimValue, targetAim, aimSmooth * Time.deltaTime);
+        SetAim(aimValue);
+    }
+
+    void SetAim(float v)
+    {
+        if (animator == null) return;
+        animator.SetFloat(aimParam, v);
+    }
+
+    void RotateRootTowards(Transform target)
+    {
+        Vector3 dir = target.position - transform.position;
+        dir.y = 0f;
+
+        if (dir.sqrMagnitude < 0.001f) return;
+
+        Quaternion lookRot = Quaternion.LookRotation(dir.normalized, Vector3.up);
+        transform.rotation = Quaternion.Slerp(transform.rotation, lookRot, rotateSpeed * Time.deltaTime);
+    }
+
+    void ShootAt(Transform target)
     {
         Vector3 dir = target.position - shootPoint.position;
         dir.y = 0f;
         if (dir.sqrMagnitude < 0.001f) return;
 
         Quaternion rot = Quaternion.LookRotation(dir.normalized, Vector3.up);
-
         GameObject arrowObj = Instantiate(arrowPrefab, shootPoint.position, rot);
 
         ArrowProjectile proj = arrowObj.GetComponent<ArrowProjectile>();
-        if (proj != null)
-        {
-            proj.target = target;
-        }
+        if (proj != null) proj.target = target;
     }
 
-    // 🔥 En düşük can yüzdesi + line of sight
-    private Transform FindLowestHealthVisibleEnemyInRange()
+    // En düşük can yüzdesi + line of sight
+    Transform FindLowestHealthVisibleEnemyInRange()
     {
         Collider[] hits = Physics.OverlapSphere(transform.position, attackRange);
 
@@ -87,9 +160,7 @@ public class PlayerArcher : MonoBehaviour
             Health h = hit.GetComponent<Health>();
             if (h == null || h.currentHealth <= 0) continue;
 
-            // Önce görüş hattı kontrolü
-            if (!HasLineOfSight(hit.transform))
-                continue;
+            if (!HasLineOfSight(hit.transform)) continue;
 
             float ratio = (float)h.currentHealth / h.maxHealth;
             float distSqr = (hit.transform.position - transform.position).sqrMagnitude;
@@ -106,35 +177,24 @@ public class PlayerArcher : MonoBehaviour
         return bestTarget;
     }
 
-    // 👀 Görüş hattı kontrolü: Aradaki ilk collider Enemy mi?
-    private bool HasLineOfSight(Transform enemy)
+    bool HasLineOfSight(Transform enemy)
     {
-        if (shootPoint == null) return false;
-
         Vector3 origin = shootPoint.position;
         Vector3 targetPos = enemy.position + Vector3.up * targetHeightOffset;
+
         Vector3 dir = targetPos - origin;
         float dist = dir.magnitude;
 
         if (dist <= 0.01f) return true;
-
-        dir /= dist; // normalize
+        dir /= dist;
 
         if (Physics.Raycast(origin, dir, out RaycastHit hit, dist, ~0, QueryTriggerInteraction.Ignore))
-        {
-            // İlk çarpan şey düşmanın kendisiyse, görüş var
-            if (hit.collider.CompareTag("Enemy"))
-                return true;
+            return hit.collider.CompareTag("Enemy");
 
-            // Başka bir şeye çarptıysa (duvar, bina vs.) arada engel var demektir
-            return false;
-        }
-
-        // Hiçbir şeye çarpmadıysa, boşlukta demektir → görüş var
         return true;
     }
 
-    private void OnDrawGizmosSelected()
+    void OnDrawGizmosSelected()
     {
         Gizmos.color = Color.yellow;
         Gizmos.DrawWireSphere(transform.position, attackRange);
