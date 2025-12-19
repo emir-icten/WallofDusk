@@ -1,6 +1,6 @@
 using UnityEngine;
 
-public class Health : MonoBehaviour
+public class Health : MonoBehaviour, IPoolable
 {
     [Header("Can Ayarları")]
     public int maxHealth = 100;
@@ -18,9 +18,8 @@ public class Health : MonoBehaviour
 
     public void TakeDamage(int amount)
     {
-        if (currentHealth <= 0) return;
-
         currentHealth -= amount;
+
         if (currentHealth <= 0)
         {
             currentHealth = 0;
@@ -28,25 +27,36 @@ public class Health : MonoBehaviour
         }
     }
 
-    public void Heal(int amount)
-    {
-        if (currentHealth <= 0) return;
-        currentHealth = Mathf.Min(maxHealth, currentHealth + amount);
-    }
-
     private void Die()
     {
         Debug.Log($"{name} öldü. isBase = {isBase}");
 
+        // Base ölürse oyun biter
         if (isBase && FlowUI.Instance != null)
         {
             Debug.Log("FlowUI.OnGameOver() çağrıldı");
             FlowUI.Instance.OnGameOver();
+            return;
         }
 
+        // Enemy vb. objeler ölünce: pooled ise havuza dön, değilse destroy
         if (destroyOnDeath && !isBase)
         {
-            Destroy(gameObject);
+            if (PoolManager.Instance != null && GetComponent<PooledObject>() != null)
+                PoolManager.Instance.Despawn(gameObject);
+            else
+                Destroy(gameObject);
         }
+    }
+
+    // Pool’dan tekrar çıkınca can reset
+    public void OnSpawned()
+    {
+        currentHealth = maxHealth;
+    }
+
+    public void OnDespawned()
+    {
+        // İstersen burada VFX/Bar reset ekleyebilirsin.
     }
 }

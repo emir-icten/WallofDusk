@@ -1,6 +1,6 @@
 using UnityEngine;
 
-public class ArrowProjectile : MonoBehaviour
+public class ArrowProjectile : MonoBehaviour, IPoolable
 {
     [Header("Ok Ayarları")]
     public float speed = 20f;
@@ -14,15 +14,20 @@ public class ArrowProjectile : MonoBehaviour
     public float collisionDelay = 0.05f;
 
     [HideInInspector]
-    public Transform target;   // PlayerArcher burayı set ediyor
+    public Transform target;
 
-    float age = 0f;
-    bool canCollide => age >= collisionDelay;
+    private float age;
+    private bool canCollide => age >= collisionDelay;
 
-    private void Start()
+    public void OnSpawned()
     {
-        // Belirli süre sonra otomatik yok olsun
-        Destroy(gameObject, lifeTime);
+        age = 0f;
+    }
+
+    public void OnDespawned()
+    {
+        age = 0f;
+        target = null;
     }
 
     private void Update()
@@ -31,12 +36,9 @@ public class ArrowProjectile : MonoBehaviour
 
         if (target != null)
         {
-            // Hedefe doğru homing
             Vector3 toTarget = target.position - transform.position;
-            float dist = toTarget.magnitude;
 
-            // Yeterince yaklaştıysak vur
-            if (dist <= hitRadius)
+            if (toTarget.magnitude <= hitRadius)
             {
                 HitTarget(target);
                 return;
@@ -46,48 +48,55 @@ public class ArrowProjectile : MonoBehaviour
             transform.position += dir * speed * Time.deltaTime;
 
             if (dir.sqrMagnitude > 0.0001f)
-            {
-                transform.rotation = Quaternion.LookRotation(dir, Vector3.up);
-            }
+                transform.forward = dir;
         }
         else
         {
-            // Hedef yoksa düz ilerle
             transform.position += transform.forward * speed * Time.deltaTime;
+        }
+
+        if (age >= lifeTime)
+        {
+            DespawnSelf();
         }
     }
 
-    private void HitTarget(Transform other)
+    private void HitTarget(Transform hitTransform)
     {
-        Health h = other.GetComponent<Health>();
-        if (h != null)
+        if (hitTransform != null && hitTransform.CompareTag("Enemy"))
         {
-            h.TakeDamage(damage);
+            Health h = hitTransform.GetComponent<Health>();
+            if (h != null)
+                h.TakeDamage(damage);
         }
 
-        Destroy(gameObject);
+        DespawnSelf();
     }
 
     private void OnTriggerEnter(Collider other)
     {
-        // İlk birkaç milisaniyede çarpışmayı görmezden gel
         if (!canCollide) return;
 
-        // Enemy'e çarparsa garanti vur
         if (other.CompareTag("Enemy"))
         {
             HitTarget(other.transform);
             return;
         }
 
-        // Player'a, okçuya çarpıyorsa yok say
         if (other.CompareTag("Player"))
             return;
 
-        // Onun dışındaki Tüm solid objeler (duvar, bina, zemin vs.) oku durdursun
         if (!other.isTrigger)
         {
-            Destroy(gameObject);
+            DespawnSelf();
         }
+    }
+
+    private void DespawnSelf()
+    {
+        if (PoolManager.Instance != null && GetComponent<PooledObject>() != null)
+            PoolManager.Instance.Despawn(gameObject);
+        else
+            Destroy(gameObject);
     }
 }

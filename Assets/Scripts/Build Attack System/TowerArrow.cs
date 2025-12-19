@@ -1,6 +1,7 @@
+using System.Collections;
 using UnityEngine;
 
-public class TowerArrow : MonoBehaviour
+public class TowerArrow : MonoBehaviour, IPoolable
 {
     [Header("Hareket")]
     public float speed = 12f;
@@ -10,29 +11,53 @@ public class TowerArrow : MonoBehaviour
     public int damage = 10;
     public string targetTag = "Enemy";
 
-    private void Start()
+    private Coroutine lifeCo;
+
+    public void OnSpawned()
     {
-        // Belirli süre sonra kaybolsun
-        Destroy(gameObject, lifeTime);
+        if (lifeCo != null) StopCoroutine(lifeCo);
+        lifeCo = StartCoroutine(LifeTimer());
+    }
+
+    public void OnDespawned()
+    {
+        if (lifeCo != null) StopCoroutine(lifeCo);
+        lifeCo = null;
+    }
+
+    private IEnumerator LifeTimer()
+    {
+        yield return new WaitForSeconds(lifeTime);
+        DespawnSelf();
     }
 
     private void Update()
     {
-        // Hep ileri doğru hareket et
         transform.position += transform.forward * speed * Time.deltaTime;
     }
 
     private void OnTriggerEnter(Collider other)
     {
-        // Sadece hedef tag'e sahip objeleri vur
         if (!other.CompareTag(targetTag)) return;
 
         Health h = other.GetComponent<Health>();
         if (h != null && h.currentHealth > 0)
-        {
             h.TakeDamage(damage);
+
+        DespawnSelf();
+    }
+
+    private void DespawnSelf()
+    {
+        if (lifeCo != null)
+        {
+            StopCoroutine(lifeCo);
+            lifeCo = null;
         }
 
-        Destroy(gameObject);
+        if (PoolManager.Instance != null && GetComponent<PooledObject>() != null)
+            PoolManager.Instance.Despawn(gameObject);
+        else
+            Destroy(gameObject);
     }
 }

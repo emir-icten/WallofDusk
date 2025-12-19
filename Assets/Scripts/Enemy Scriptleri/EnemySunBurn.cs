@@ -5,15 +5,16 @@ using UnityEngine;
 public class EnemySunBurn : MonoBehaviour
 {
     [Header("Güneş Hasarı")]
-    public int burnDamagePerTick = 2;      // Her tikte kaç HP gitsin
-    public float tickInterval = 0.2f;      // Kaç saniyede bir vursun
+    public int burnDamagePerTick = 2;
+    public float tickInterval = 0.2f;
 
     [Header("Davranış")]
-    public bool disableAIWhileBurning = true;  // Yanarken saldırmasın mı?
+    public bool disableAIWhileBurning = true;
 
     private Health health;
     private EnemyAI enemyAI;
     private bool isBurning = false;
+    private Coroutine burnCo;
 
     private void Awake()
     {
@@ -27,26 +28,23 @@ public class EnemySunBurn : MonoBehaviour
         isBurning = true;
 
         if (disableAIWhileBurning && enemyAI != null)
-        {
-            enemyAI.enabled = false;  // Yanarken hareket/saldırı dursun
-        }
+            enemyAI.enabled = false;
 
-        StartCoroutine(BurnRoutine());
+        if (burnCo != null) StopCoroutine(burnCo);
+        burnCo = StartCoroutine(BurnRoutine());
     }
 
     private IEnumerator BurnRoutine()
     {
-        // Canı bitene kadar 2 2 erit
         while (health != null && health.currentHealth > 0)
         {
             health.TakeDamage(burnDamagePerTick);
             yield return new WaitForSeconds(tickInterval);
         }
 
-        // Canı 0'a düşünce düşmanı yok et
-        if (gameObject != null)
-        {
-            Destroy(gameObject);
-        }
+        // Burada Destroy/Despawn yapmıyoruz.
+        // Health.TakeDamage -> Die() zaten pooled ise Despawn ediyor.
+        burnCo = null;
+        isBurning = false;
     }
 }

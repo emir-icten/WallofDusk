@@ -1,6 +1,7 @@
+using System.Collections;
 using UnityEngine;
 
-public class MageProjectile : MonoBehaviour
+public class MageProjectile : MonoBehaviour, IPoolable
 {
     [Header("Hareket")]
     public float speed = 10f;
@@ -13,23 +14,14 @@ public class MageProjectile : MonoBehaviour
     public LayerMask enemyMask;
 
     [Header("Efektler")]
-    public ParticleSystem impactEffect;   // Çarpma / patlama efekti
+    public ParticleSystem impactEffect;
 
     private Vector3 moveDir;
     private bool hasExploded = false;
-
-    // Beni atan kule
     private Transform owner;
 
-    private void OnEnable()
-    {
-        // Yeni spawn olan her projectile tertemiz başlasın
-        hasExploded = false;
-    }
+    private Coroutine lifeCo;
 
-    /// <summary>
-    /// Kule bu füzeyi hazırlarken çağırıyor.
-    /// </summary>
     public void Init(
         Vector3 direction,
         int damageAmount,
@@ -47,16 +39,38 @@ public class MageProjectile : MonoBehaviour
         this.owner = owner;
     }
 
-    private void Start()
+    private void OnEnable()
     {
-        // Her ihtimale karşı belirli süreden sonra yok olsun
-        Destroy(gameObject, lifeTime);
+        hasExploded = false;
+    }
+
+    public void OnSpawned()
+    {
+        hasExploded = false;
+
+        if (lifeCo != null) StopCoroutine(lifeCo);
+        lifeCo = StartCoroutine(LifeTimer());
+    }
+
+    public void OnDespawned()
+    {
+        if (lifeCo != null) StopCoroutine(lifeCo);
+        lifeCo = null;
+
+        owner = null;
+        moveDir = Vector3.zero;
+        hasExploded = false;
+    }
+
+    private IEnumerator LifeTimer()
+    {
+        yield return new WaitForSeconds(lifeTime);
+        DespawnSelf();
     }
 
     private void Update()
     {
         if (hasExploded) return;
-
         transform.position += moveDir * speed * Time.deltaTime;
     }
 
@@ -64,14 +78,11 @@ public class MageProjectile : MonoBehaviour
     {
         if (hasExploded) return;
 
-        // 1) KENDİ KULESİNE ÇARPARSA YOK SAY
-        if (owner != null &&
-            (other.transform == owner || other.transform.IsChildOf(owner)))
-        {
+        // kendi kulesine çarpmasın
+        if (owner != null && (other.transform == owner || other.transform.IsChildOf(owner)))
             return;
-        }
 
-        // 2) Şimdilik sadece hedef tag veya Ground olunca patlat
+        // hedef veya ground
         if (!other.CompareTag(targetTag) && !other.CompareTag("Ground"))
             return;
 
@@ -82,18 +93,13 @@ public class MageProjectile : MonoBehaviour
     {
         hasExploded = true;
 
-        // Patlama efekti
         if (impactEffect != null)
         {
             ParticleSystem fx = Instantiate(impactEffect, transform.position, Quaternion.identity);
             fx.Play();
-            Destroy(
-                fx.gameObject,
-                fx.main.duration + fx.main.startLifetime.constantMax
-            );
+            Destroy(fx.gameObject, fx.main.duration + fx.main.startLifetime.constantMax);
         }
 
-        // Alan hasarı
         Collider[] hits;
         if (enemyMask.value != 0)
             hits = Physics.OverlapSphere(transform.position, explosionRadius, enemyMask);
@@ -106,12 +112,24 @@ public class MageProjectile : MonoBehaviour
 
             Health h = hit.GetComponent<Health>();
             if (h != null && h.currentHealth > 0)
-            {
                 h.TakeDamage(damage);
-            }
         }
 
-        Destroy(gameObject);
+        DespawnSelf();
+    }
+
+    private void DespawnSelf()
+    {
+        if (lifeCo != null)
+        {
+            StopCoroutine(lifeCo);
+            lifeCo = null;
+        }
+
+        if (PoolManager.Instance != null && GetComponent<PooledObject>() != null)
+            PoolManager.Instance.Despawn(gameObject);
+        else
+            Destroy(gameObject);
     }
 
     private void OnDrawGizmosSelected()
