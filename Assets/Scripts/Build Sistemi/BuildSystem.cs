@@ -55,7 +55,7 @@ public class BuildSystem : MonoBehaviour
     [Header("Referanslar")]
     public PlayerBuilder playerBuilder;
 
-        /// <summary>
+    /// <summary>
     /// Aktif player değiştiğinde çağırılır.
     /// </summary>
     public void SetPlayerBuilder(PlayerBuilder newBuilder)
@@ -69,9 +69,8 @@ public class BuildSystem : MonoBehaviour
         {
             Debug.Log("BuildSystem: PlayerBuilder NULL oldu.");
         }
-    } 
-    
-    
+    }
+
     [Header("Ghost & Zemin Uyarı Renkleri")]
     public Color validColor = new Color(0.5f, 1f, 0.5f, 1f);   // geçerli yer
     public Color invalidColor = new Color(1f, 0.4f, 0.4f, 1f); // geçersiz yer
@@ -83,6 +82,16 @@ public class BuildSystem : MonoBehaviour
     [Tooltip("R tuşuna her bastığında kaç derece döndürsün?")]
     public float rotationStep = 90f;
     public KeyCode rotateKey = KeyCode.R;
+
+    // ============================
+    // ✅ Performans (NonAlloc)
+    // ============================
+    [Header("GC/Performans (NonAlloc)")]
+    [SerializeField] private int placementOverlapBufferSize = 64;
+    [SerializeField] private int wallSnapOverlapBufferSize = 32;
+
+    private Collider[] _placementOverlapHits;
+    private Collider[] _wallSnapOverlapHits;
 
     // ---- internal state ----
     private Camera mainCam;
@@ -113,6 +122,10 @@ public class BuildSystem : MonoBehaviour
         }
 
         Instance = this;
+
+        // ✅ NonAlloc buffer init (tek sefer)
+        _placementOverlapHits = new Collider[Mathf.Max(8, placementOverlapBufferSize)];
+        _wallSnapOverlapHits = new Collider[Mathf.Max(8, wallSnapOverlapBufferSize)];
     }
 
     private void Start()
@@ -225,9 +238,9 @@ public class BuildSystem : MonoBehaviour
         bool hasHit;
 
         if (groundMask.value != 0)
-            hasHit = Physics.Raycast(ray, out hit, 200f, groundMask);
+            hasHit = Physics.Raycast(ray, out hit, 200f, groundMask, QueryTriggerInteraction.Ignore);
         else
-            hasHit = Physics.Raycast(ray, out hit, 200f);
+            hasHit = Physics.Raycast(ray, out hit, 200f, ~0, QueryTriggerInteraction.Ignore);
 
         if (!hasHit) return;
 
@@ -274,9 +287,9 @@ public class BuildSystem : MonoBehaviour
         bool hasHit;
 
         if (groundMask.value != 0)
-            hasHit = Physics.Raycast(ray, out hit, 200f, groundMask);
+            hasHit = Physics.Raycast(ray, out hit, 200f, groundMask, QueryTriggerInteraction.Ignore);
         else
-            hasHit = Physics.Raycast(ray, out hit, 200f);
+            hasHit = Physics.Raycast(ray, out hit, 200f, ~0, QueryTriggerInteraction.Ignore);
 
         if (!hasHit)
         {
@@ -375,18 +388,27 @@ public class BuildSystem : MonoBehaviour
     {
         float radius = Mathf.Max(0.01f, cfg.wallSnapDistance);
 
-        // 1) Yakındaki duvarları bul
-        Collider[] hits;
+        // ✅ 1) Yakındaki duvarları bul (NonAlloc)
+        int hitCount;
         if (buildingMask.value != 0)
-            hits = Physics.OverlapSphere(pos, radius, buildingMask);
+        {
+            hitCount = Physics.OverlapSphereNonAlloc(
+                pos, radius, _wallSnapOverlapHits, buildingMask, QueryTriggerInteraction.Ignore
+            );
+        }
         else
-            hits = Physics.OverlapSphere(pos, radius);
+        {
+            hitCount = Physics.OverlapSphereNonAlloc(
+                pos, radius, _wallSnapOverlapHits, ~0, QueryTriggerInteraction.Ignore
+            );
+        }
 
         Transform nearestWall = null;
         float bestSqr = Mathf.Infinity;
 
-        foreach (var hit in hits)
+        for (int i = 0; i < hitCount; i++)
         {
+            var hit = _wallSnapOverlapHits[i];
             if (hit == null) continue;
             if (!hit.CompareTag(wallTag)) continue;
 
@@ -483,28 +505,37 @@ public class BuildSystem : MonoBehaviour
         }
 
         // 2) Diğer kule / binalara çok yakın mı?
-       // 2) Diğer kule / binalara çok yakın mı?
-// ⚠ Bu kuralı SADECE duvar olmayan yapılar için uygula.
-// Duvar inşa ederken kulelere yaklaşabilsin.
-if (minDistanceBetweenBuildings > 0.01f && (currentConfig == null || !currentConfig.isWall))
-{
-    Collider[] hits;
+        // ⚠ Bu kuralı SADECE duvar olmayan yapılar için uygula.
+        // Duvar inşa ederken kulelere yaklaşabilsin.
+        if (minDistanceBetweenBuildings > 0.01f && (currentConfig == null || !currentConfig.isWall))
+        {
+            // ✅ NonAlloc
+            int hitCount;
+            if (buildingMask.value != 0)
+            {
+                hitCount = Physics.OverlapSphereNonAlloc(
+                    pos, minDistanceBetweenBuildings, _placementOverlapHits, buildingMask, QueryTriggerInteraction.Ignore
+                );
+            }
+            else
+            {
+                hitCount = Physics.OverlapSphereNonAlloc(
+                    pos, minDistanceBetweenBuildings, _placementOverlapHits, ~0, QueryTriggerInteraction.Ignore
+                );
+            }
 
-    if (buildingMask.value != 0)
-        hits = Physics.OverlapSphere(pos, minDistanceBetweenBuildings, buildingMask);
-    else
-        hits = Physics.OverlapSphere(pos, minDistanceBetweenBuildings);
+            for (int i = 0; i < hitCount; i++)
+            {
+                var hit = _placementOverlapHits[i];
+                if (hit == null) continue;
 
-    foreach (var hit in hits)
-    {
-        if (hit == null) continue;
+                // ✅ Ghost’un kendi collider’ına takılma (nadiren olur ama olursa placement hep invalid görünür)
+                if (currentGhost != null && hit.transform.IsChildOf(currentGhost.transform))
+                    continue;
 
-        // Bu noktaya gelmişsek, zaten duvar inşa ETMİYORUZ demektir.
-        // Yani herhangi bir bina çok yakınsa: geçersiz.
-        return false;
-    }
-}
-
+                return false;
+            }
+        }
 
         return true;
     }

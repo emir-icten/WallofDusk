@@ -7,8 +7,11 @@ public class PlayerMovementCC : MonoBehaviour
     public float moveSpeed = 8f;
     public float rotationSpeed = 10f;
 
-    [Header("Joystick (isteğe bağlı)")]
+    [Header("Joystick (Fixed Joystick)")]
     public Joystick moveJoystick;
+
+    [Tooltip("Joystick aktif sayılması için minimum eşik")]
+    public float joystickDeadzone = 0.05f;
 
     [Header("Yerçekimi / Zemine Yapışma")]
     public float gravity = -25f;
@@ -17,12 +20,12 @@ public class PlayerMovementCC : MonoBehaviour
     [Header("Kontrol Kilidi")]
     public bool inputLocked = false;
 
-    CharacterController cc;
-    Transform cam;
-    Animator animator;
+    private CharacterController cc;
+    private Transform cam;
+    private Animator animator;
 
-    Vector3 moveDir;
-    float verticalVel;
+    private Vector3 moveDir;
+    private float verticalVel;
 
     void Awake()
     {
@@ -39,6 +42,8 @@ public class PlayerMovementCC : MonoBehaviour
         UpdateAnimator();
     }
 
+    // ---------------- INPUT ----------------
+
     void HandleInput()
     {
         if (inputLocked)
@@ -47,19 +52,20 @@ public class PlayerMovementCC : MonoBehaviour
             return;
         }
 
-        float inputX, inputZ;
+        float inputX = 0f;
+        float inputZ = 0f;
 
-        bool joystickActive =
-            moveJoystick != null &&
-            (Mathf.Abs(moveJoystick.Horizontal) > 0.05f || Mathf.Abs(moveJoystick.Vertical) > 0.05f);
-
-        if (joystickActive)
+        // 1️⃣ Fixed Joystick varsa ve oynatılıyorsa
+        if (moveJoystick != null &&
+            (Mathf.Abs(moveJoystick.Horizontal) > joystickDeadzone ||
+             Mathf.Abs(moveJoystick.Vertical) > joystickDeadzone))
         {
             inputX = moveJoystick.Horizontal;
             inputZ = moveJoystick.Vertical;
         }
         else
         {
+            // 2️⃣ Klavye fallback (Editor / PC)
             inputX = Input.GetAxisRaw("Horizontal");
             inputZ = Input.GetAxisRaw("Vertical");
         }
@@ -72,33 +78,52 @@ public class PlayerMovementCC : MonoBehaviour
             Vector3 r = cam.right;   r.y = 0f; r.Normalize();
             moveDir = (f * inputDir.z + r * inputDir.x);
         }
-        else moveDir = inputDir;
-    }
-
-    void HandleRotation()
-    {
-        Vector3 flat = moveDir; flat.y = 0f;
-        if (flat.sqrMagnitude > 0.001f)
+        else
         {
-            Quaternion targetRot = Quaternion.LookRotation(flat, Vector3.up);
-            transform.rotation = Quaternion.Slerp(transform.rotation, targetRot, rotationSpeed * Time.deltaTime);
+            moveDir = inputDir;
         }
     }
 
+    // ---------------- ROTATION ----------------
+
+    void HandleRotation()
+    {
+        Vector3 flat = moveDir; 
+        flat.y = 0f;
+
+        if (flat.sqrMagnitude > 0.001f)
+        {
+            Quaternion targetRot = Quaternion.LookRotation(flat, Vector3.up);
+            transform.rotation = Quaternion.Slerp(
+                transform.rotation,
+                targetRot,
+                rotationSpeed * Time.deltaTime
+            );
+        }
+    }
+
+    // ---------------- GRAVITY + MOVE ----------------
+
     void ApplyGravityAndMove()
     {
-        if (cc.isGrounded && verticalVel < 0f) verticalVel = groundStick;
+        if (cc.isGrounded && verticalVel < 0f)
+            verticalVel = groundStick;
+
         verticalVel += gravity * Time.deltaTime;
 
-        Vector3 vel = moveDir * moveSpeed;
-        vel.y = verticalVel;
+        Vector3 velocity = moveDir * moveSpeed;
+        velocity.y = verticalVel;
 
-        cc.Move(vel * Time.deltaTime);
+        cc.Move(velocity * Time.deltaTime);
     }
+
+    // ---------------- ANIMATOR ----------------
 
     void UpdateAnimator()
     {
         if (animator == null) return;
-        animator.SetFloat("Speed", new Vector3(moveDir.x, 0f, moveDir.z).magnitude);
+
+        float speed = new Vector3(moveDir.x, 0f, moveDir.z).magnitude;
+        animator.SetFloat("Speed", speed);
     }
 }
