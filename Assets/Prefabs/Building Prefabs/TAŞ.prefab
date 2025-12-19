@@ -101,11 +101,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5c858b8ebad812148a72d41a432c067c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  resourceType: Stone
+  resourceType: 1
   totalResourceAmount: 20
+  timeToChop: 4
   stumpPrefab: {fileID: 3924240756116203690, guid: 6e1620ff48f3240408ba82074c6fce11, type: 3}
   lootUIPrefab: {fileID: 2225601234442345907, guid: a4d62ee74a7de5f408cad4f8ae98f47c, type: 3}
-  timeToChop: 4
 --- !u!65 &3472526668201000427
 BoxCollider:
   m_ObjectHideFlags: 0

@@ -1766,11 +1766,6 @@ Camera:
   m_CorrespondingSourceObject: {fileID: 6119856854196645530, guid: 787d07c38aa18154f9d6e93a42a8b8ba, type: 3}
   m_PrefabInstance: {fileID: 1270139490}
   m_PrefabAsset: {fileID: 0}
---- !u!4 &1026177729 stripped
-Transform:
-  m_CorrespondingSourceObject: {fileID: 372113160834222369, guid: 787d07c38aa18154f9d6e93a42a8b8ba, type: 3}
-  m_PrefabInstance: {fileID: 1270139490}
-  m_PrefabAsset: {fileID: 0}
 --- !u!1 &1033258905
 GameObject:
   m_ObjectHideFlags: 0
@@ -2138,7 +2133,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 07e0b3d803d6c424daf6d297b8bc6827, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  rangerPrefab: {fileID: 6456655193419911047, guid: a19c57b45f17d934a992c15ab85c0088, type: 3}
+  rangerPrefab: {fileID: 4878443315902200370, guid: a19c57b45f17d934a992c15ab85c0088, type: 3}
   knightPrefab: {fileID: 5645305309827398917, guid: 2d4e44d9fde5a9e448b3b65bf51ac655, type: 3}
   magePrefab: {fileID: 2570241526689686243, guid: b19cd7b99e0a05b43ad4bf6bd81dd093, type: 3}
   spawnPoint: {fileID: 1260355753}
@@ -2462,13 +2457,10 @@ Transform:
   m_GameObject: {fileID: 1260355752}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -4.2, y: 0.001, z: -6}
+  m_LocalPosition: {x: -5.02, y: 0.001, z: -8.33}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
-  m_Children:
-  - {fileID: 1026177729}
-  - {fileID: 820690845}
-  - {fileID: 5864019123305841228}
+  m_Children: []
   m_Father: {fileID: 1485818187}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1001 &1270139490
@@ -2477,19 +2469,19 @@ PrefabInstance:
   serializedVersion: 2
   m_Modification:
     serializedVersion: 3
-    m_TransformParent: {fileID: 1260355753}
+    m_TransformParent: {fileID: 0}
     m_Modifications:
     - target: {fileID: 372113160834222369, guid: 787d07c38aa18154f9d6e93a42a8b8ba, type: 3}
       propertyPath: m_LocalPosition.x
-      value: 2.4899998
+      value: -2.5300002
       objectReference: {fileID: 0}
     - target: {fileID: 372113160834222369, guid: 787d07c38aa18154f9d6e93a42a8b8ba, type: 3}
       propertyPath: m_LocalPosition.y
-      value: 21.699001
+      value: 21.7
       objectReference: {fileID: 0}
     - target: {fileID: 372113160834222369, guid: 787d07c38aa18154f9d6e93a42a8b8ba, type: 3}
       propertyPath: m_LocalPosition.z
-      value: -9.87
+      value: -18.2
       objectReference: {fileID: 0}
     - target: {fileID: 372113160834222369, guid: 787d07c38aa18154f9d6e93a42a8b8ba, type: 3}
       propertyPath: m_LocalRotation.w
@@ -3879,7 +3871,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   spawner: {fileID: 1408215139}
   text: {fileID: 1813594500}
-  prefix: 'You Only '
+  prefix: You Only Survived
   suffix: ' Night'
   zeroNightMessage: Are u noob???
 --- !u!114 &1813594500
@@ -4821,7 +4813,7 @@ PrefabInstance:
   serializedVersion: 2
   m_Modification:
     serializedVersion: 3
-    m_TransformParent: {fileID: 1260355753}
+    m_TransformParent: {fileID: 0}
     m_Modifications:
     - target: {fileID: 69334333931951561, guid: e845d54a3523f4d40b116efc4f978bbb, type: 3}
       propertyPath: m_AnchorMin.x
@@ -5290,7 +5282,7 @@ PrefabInstance:
   serializedVersion: 2
   m_Modification:
     serializedVersion: 3
-    m_TransformParent: {fileID: 1260355753}
+    m_TransformParent: {fileID: 0}
     m_Modifications:
     - target: {fileID: 1798259519752543579, guid: 374f53a8423f08f4eac0c77ad7e5a267, type: 3}
       propertyPath: m_LocalScale.x
@@ -5306,15 +5298,15 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 1798259519752543579, guid: 374f53a8423f08f4eac0c77ad7e5a267, type: 3}
       propertyPath: m_LocalPosition.x
-      value: 4.1999993
+      value: -0.82000065
       objectReference: {fileID: 0}
     - target: {fileID: 1798259519752543579, guid: 374f53a8423f08f4eac0c77ad7e5a267, type: 3}
       propertyPath: m_LocalPosition.y
-      value: 0
+      value: 0.001
       objectReference: {fileID: 0}
     - target: {fileID: 1798259519752543579, guid: 374f53a8423f08f4eac0c77ad7e5a267, type: 3}
       propertyPath: m_LocalPosition.z
-      value: 6
+      value: -2.33
       objectReference: {fileID: 0}
     - target: {fileID: 1798259519752543579, guid: 374f53a8423f08f4eac0c77ad7e5a267, type: 3}
       propertyPath: m_LocalRotation.w
@@ -5448,3 +5440,6 @@ SceneRoots:
   - {fileID: 1485818186}
   - {fileID: 1095175629}
   - {fileID: 5063574400036810935}
+  - {fileID: 8000666512468039989}
+  - {fileID: 5864019123305841227}
+  - {fileID: 1270139490}

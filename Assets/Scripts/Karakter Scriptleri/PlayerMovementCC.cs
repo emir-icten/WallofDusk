@@ -14,6 +14,9 @@ public class PlayerMovementCC : MonoBehaviour
     public float gravity = -25f;
     public float groundStick = -2f;
 
+    [Header("Kontrol Kilidi")]
+    public bool inputLocked = false;
+
     CharacterController cc;
     Transform cam;
     Animator animator;
@@ -38,6 +41,12 @@ public class PlayerMovementCC : MonoBehaviour
 
     void HandleInput()
     {
+        if (inputLocked)
+        {
+            moveDir = Vector3.zero;
+            return;
+        }
+
         float inputX, inputZ;
 
         bool joystickActive =
