@@ -8,8 +8,8 @@ public class PlayerHarvestTool : MonoBehaviour
     public GameObject axe;      // Sağ elde
 
     [Header("Refs")]
-    public Animator animator;           // Graphics_Ranger üzerindeki Animator
-    public PlayerMovementCC movement;   // PlayerMovementCC (inputLocked olan)
+    public Animator animator;           // Character üzerindeki Animator
+    public PlayerMovementCC movement;   // inputLocked olan
 
     [Header("Animator Parametreleri (isimler birebir aynı olmalı)")]
     public string harvestingBool = "Harvesting";
@@ -18,10 +18,23 @@ public class PlayerHarvestTool : MonoBehaviour
 
     [Header("Ayarlar")]
     public bool lockMovementWhileHarvesting = true;
-    public float faceSpeedDeg = 1080f;          // hedefe hızlı dönme
+
+    [Tooltip("Harvest sırasında hedefe otomatik dönsün mü? Dönme sorunu yaşarsan kapatabilirsin.")]
+    public bool rotateToTargetWhileHarvesting = true;
+
+    [Tooltip("Hedefe dönerken dönüş hızı (deg/s). Çok yüksek olursa jitter/spin hissi verebilir.")]
+    public float faceSpeedDeg = 540f;
+
+    [Tooltip("Hedef çok yakınsa dönmeyi durdur (spin önler).")]
+    public float minTurnDistance = 0.35f;
 
     bool harvesting;
-    Transform lookTarget;
+
+    // Transform yerine sabit world noktası: child collider/mesh değişse bile hedef sabit kalır
+    Vector3 lookPointWorld;
+    bool hasLookPoint;
+
+    public bool IsHarvesting => harvesting;
 
     void Awake()
     {
@@ -32,21 +45,38 @@ public class PlayerHarvestTool : MonoBehaviour
 
     void Update()
     {
-        // Harvest sırasında kaynağa doğru dön
-        if (!harvesting || lookTarget == null) return;
+        if (!harvesting) return;
+        if (!rotateToTargetWhileHarvesting) return;
+        if (!hasLookPoint) return;
 
-        Vector3 dir = lookTarget.position - transform.position;
+        Vector3 dir = lookPointWorld - transform.position;
         dir.y = 0f;
+
+        // Hedef aşırı yakınsa dönme (spin önler)
+        if (dir.magnitude < minTurnDistance) return;
         if (dir.sqrMagnitude < 0.0001f) return;
 
-        Quaternion desired = Quaternion.LookRotation(dir);
+        Quaternion desired = Quaternion.LookRotation(dir.normalized, Vector3.up);
         transform.rotation = Quaternion.RotateTowards(transform.rotation, desired, faceSpeedDeg * Time.deltaTime);
     }
 
     public void OnHarvestStart(ResourceType type, Transform target)
     {
         harvesting = true;
-        lookTarget = target;
+
+        // Hedefi sabitle: Transform yerine world point
+        hasLookPoint = false;
+        if (target != null)
+        {
+            // Eğer collider varsa merkezini al (daha stabil)
+            Collider c = target.GetComponentInChildren<Collider>();
+            if (c != null)
+                lookPointWorld = c.bounds.center;
+            else
+                lookPointWorld = target.position;
+
+            hasLookPoint = true;
+        }
 
         if (movement)
             movement.inputLocked = lockMovementWhileHarvesting;
@@ -77,7 +107,7 @@ public class PlayerHarvestTool : MonoBehaviour
     public void OnHarvestStop()
     {
         harvesting = false;
-        lookTarget = null;
+        hasLookPoint = false;
 
         if (movement)
             movement.inputLocked = false;

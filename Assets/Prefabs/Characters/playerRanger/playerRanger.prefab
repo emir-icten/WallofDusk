@@ -9,7 +9,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 7926321071415602857}
-  m_Layer: 0
+  m_Layer: 10
   m_Name: handslot.l
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -40,7 +40,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 1657125049233748480}
-  m_Layer: 0
+  m_Layer: 10
   m_Name: hips
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -75,7 +75,7 @@ GameObject:
   m_Component:
   - component: {fileID: 8474751197317181020}
   - component: {fileID: 4615997374384122969}
-  m_Layer: 0
+  m_Layer: 10
   m_Name: Ranger_Body
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -185,7 +185,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 2334843529477348117}
-  m_Layer: 0
+  m_Layer: 10
   m_Name: upperarm.r
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -219,7 +219,7 @@ GameObject:
   - component: {fileID: -8679921383154817045}
   - component: {fileID: -5754084199372789682}
   - component: {fileID: -7511558181221131132}
-  m_Layer: 0
+  m_Layer: 10
   m_Name: axe
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -303,7 +303,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 4253904500385342237}
-  m_Layer: 0
+  m_Layer: 10
   m_Name: lowerleg.r
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -336,7 +336,7 @@ GameObject:
   m_Component:
   - component: {fileID: 6130758383176535164}
   - component: {fileID: 5373211930646239742}
-  m_Layer: 0
+  m_Layer: 10
   m_Name: Ranger_ArmLeft
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -446,7 +446,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 1846685483411867926}
-  m_Layer: 0
+  m_Layer: 10
   m_Name: upperleg.l
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -479,7 +479,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1306200128438646099}
   - component: {fileID: 1094565076794400976}
-  m_Layer: 0
+  m_Layer: 10
   m_Name: Ranger_LegLeft
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -589,7 +589,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 348553390041692554}
-  m_Layer: 0
+  m_Layer: 10
   m_Name: lowerarm.r
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -621,7 +621,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 5053449948546919020}
-  m_Layer: 0
+  m_Layer: 10
   m_Name: upperleg.r
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -653,7 +653,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 1710896425097200994}
-  m_Layer: 0
+  m_Layer: 10
   m_Name: toes.r
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -684,7 +684,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 7233576834864286358}
-  m_Layer: 0
+  m_Layer: 10
   m_Name: root
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -716,7 +716,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 3739121184197850738}
-  m_Layer: 0
+  m_Layer: 10
   m_Name: Rig_Medium
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -748,7 +748,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 2510258164965697410}
-  m_Layer: 0
+  m_Layer: 10
   m_Name: upperarm.l
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -780,7 +780,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 4499937086636127630}
-  m_Layer: 0
+  m_Layer: 10
   m_Name: handslot.r
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -811,7 +811,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 5723217080891449713}
-  m_Layer: 0
+  m_Layer: 10
   m_Name: head
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -844,7 +844,7 @@ GameObject:
   - component: {fileID: 8234252716218713665}
   - component: {fileID: 2833588990408716044}
   - component: {fileID: 2437966830398164639}
-  m_Layer: 0
+  m_Layer: 10
   m_Name: pickaxe
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -928,7 +928,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 6178916971039469351}
-  m_Layer: 0
+  m_Layer: 10
   m_Name: hand.r
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -961,7 +961,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 6246533723469621744}
-  m_Layer: 0
+  m_Layer: 10
   m_Name: lowerarm.l
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -993,7 +993,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 6253769254429498677}
-  m_Layer: 0
+  m_Layer: 10
   m_Name: chest
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -1027,7 +1027,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 5689756853555299066}
-  m_Layer: 0
+  m_Layer: 10
   m_Name: ShootPoint
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -1058,7 +1058,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 3958490011427844951}
-  m_Layer: 0
+  m_Layer: 10
   m_Name: toes.l
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -1090,7 +1090,7 @@ GameObject:
   m_Component:
   - component: {fileID: 7874904095872394099}
   - component: {fileID: 3786858378235019072}
-  m_Layer: 0
+  m_Layer: 10
   m_Name: Ranger_ArmRight
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -1200,7 +1200,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 8056827872129993058}
-  m_Layer: 0
+  m_Layer: 10
   m_Name: foot.l
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -1232,7 +1232,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 6375800460747402859}
-  m_Layer: 0
+  m_Layer: 10
   m_Name: wrist.l
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -1273,7 +1273,7 @@ GameObject:
   - component: {fileID: 120087228137023706}
   - component: {fileID: 5786070311833849938}
   - component: {fileID: 5099243332191453960}
-  m_Layer: 0
+  m_Layer: 10
   m_Name: playerRanger
   m_TagString: Player
   m_Icon: {fileID: 0}
@@ -1499,7 +1499,9 @@ MonoBehaviour:
   harvestHitTrigger: HarvestHit
   harvestToolInt: HarvestTool
   lockMovementWhileHarvesting: 0
+  rotateToTargetWhileHarvesting: 1
   faceSpeedDeg: 1080
+  minTurnDistance: 0.35
 --- !u!1 &5055263893509036919
 GameObject:
   m_ObjectHideFlags: 0
@@ -1509,7 +1511,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 5059407809319952620}
-  m_Layer: 0
+  m_Layer: 10
   m_Name: spine
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -1542,7 +1544,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1636296769082105539}
   - component: {fileID: 1081927273130424765}
-  m_Layer: 0
+  m_Layer: 10
   m_Name: Graphics_Ranger
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -1596,7 +1598,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 654460294668602918}
-  m_Layer: 0
+  m_Layer: 10
   m_Name: lowerleg.l
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -1628,7 +1630,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 1920842445687440325}
-  m_Layer: 0
+  m_Layer: 10
   m_Name: foot.r
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -1661,7 +1663,7 @@ GameObject:
   m_Component:
   - component: {fileID: 6764593903088187228}
   - component: {fileID: 8875338848376494241}
-  m_Layer: 0
+  m_Layer: 10
   m_Name: Ranger_LegRight
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -1771,7 +1773,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 5042224068890843151}
-  m_Layer: 0
+  m_Layer: 10
   m_Name: wrist.r
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -1803,7 +1805,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 7496262172147139686}
-  m_Layer: 0
+  m_Layer: 10
   m_Name: hand.l
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -1837,7 +1839,7 @@ GameObject:
   m_Component:
   - component: {fileID: 3987989525423387150}
   - component: {fileID: 3294203353083781602}
-  m_Layer: 0
+  m_Layer: 10
   m_Name: Ranger_Cape
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -1947,7 +1949,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 3068095094930503621}
-  m_Layer: 0
+  m_Layer: 10
   m_Name: Ranger
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -1988,7 +1990,7 @@ GameObject:
   m_Component:
   - component: {fileID: 6950793858411959683}
   - component: {fileID: 7267438401878204457}
-  m_Layer: 0
+  m_Layer: 10
   m_Name: bow_withString
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -2077,7 +2079,7 @@ GameObject:
   m_Component:
   - component: {fileID: 810512362709476581}
   - component: {fileID: 552948509410438611}
-  m_Layer: 0
+  m_Layer: 10
   m_Name: Ranger_Quiver
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -2188,7 +2190,7 @@ GameObject:
   m_Component:
   - component: {fileID: 5081552350067597171}
   - component: {fileID: 1615213328646842646}
-  m_Layer: 0
+  m_Layer: 10
   m_Name: Ranger_Head
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -2298,7 +2300,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 4003137346166702222}
-  m_Layer: 0
+  m_Layer: 10
   m_Name: RightHandSocket
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -2331,7 +2333,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 8152216820162271338}
-  m_Layer: 0
+  m_Layer: 10
   m_Name: LeftHandSocket
   m_TagString: Untagged
   m_Icon: {fileID: 0}

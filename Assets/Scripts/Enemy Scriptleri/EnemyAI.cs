@@ -1,59 +1,71 @@
 using UnityEngine;
 
 [RequireComponent(typeof(Health))]
+[RequireComponent(typeof(Rigidbody))]
+[RequireComponent(typeof(CapsuleCollider))]
 public class EnemyAI : MonoBehaviour
 {
     [Header("Ana Hedef (Base)")]
-    public Transform baseTarget;              // Base binasının Transform'u
+    public Transform baseTarget;
 
     [Header("Hareket Ayarları")]
     public float moveSpeed = 3f;
-    public float stopDistance = 2f;           // Hedefe bu kadar yaklaştığında durur
+    public float stopDistance = 2f;
 
     [Header("Saldırı Ayarları")]
     public int attackDamage = 5;
-    public float attackInterval = 1.5f;       // Kaç saniyede bir vuracak
-    public float attackRange = 2.5f;          // Bu mesafeden yakınsa vurabilir
+    public float attackInterval = 1.5f;
+    public float attackRange = 2.5f;
 
     [Header("Yapı Hedefleme")]
-    [Tooltip("Yakınındaki yapıları bu yarıçap içinde arar (Base, Tower, Building vs)")]
     public float structureDetectRadius = 6f;
-
-    [Tooltip("Hedef alınabilecek bina tag'leri (Base, Building, Tower vs)")]
     public string[] structureTags = { "Base", "Building", "Tower" };
 
     [Header("Duvar Ayarları")]
-    [Tooltip("Duvar segmentlerinin tag'i")]
     public string wallTag = "Wall";
-
-    [Tooltip("Duvara tosladıktan sonra kaç saniye boyunca o duvarı hedefte tutsun")]
     public float wallTargetStickTime = 2f;
 
     [Header("Retarget")]
-    [Tooltip("Kaç saniyede bir yeni hedef arayacak")]
     public float retargetInterval = 0.5f;
+
+    [Header("Çarpışma / Duvar İçi Önleme")]
+    [Tooltip("Enemy'nin çarpışması gereken katmanlar: Wall/Building/Base gibi. Player'ı BURAYA koyma.")]
+    public LayerMask obstacleMask;
+
+    [Tooltip("Cast ile collider arasında bırakılacak min boşluk (duvara yapışmasın)")]
+    public float collisionSkin = 0.03f;
 
     private Transform currentTarget;
     private Health currentTargetHealth;
     private float attackTimer = 0f;
 
     private Health selfHealth;
-
-    // hedef güncelleme için
     private float retargetTimer = 0f;
 
-    // Çarpılan son duvar
     private Transform lastWallTarget;
     private float lastWallTime = -999f;
+
+    // Components
+    private Rigidbody rb;
+    private CapsuleCollider cap;
 
     private void Awake()
     {
         selfHealth = GetComponent<Health>();
+        rb = GetComponent<Rigidbody>();
+        cap = GetComponent<CapsuleCollider>();
+
+        // Player'ı itmesin diye kinematic kalabilir
+        rb.isKinematic = true;
+        rb.useGravity = false;
+
+        // Kinematic + MovePosition için iyi bir seçenek
+        rb.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
+        rb.interpolation = RigidbodyInterpolation.Interpolate;
     }
 
     private void Start()
     {
-        // Başlangıçta base'i ana hedef yap
         if (baseTarget != null)
         {
             currentTarget = baseTarget;
@@ -63,18 +75,15 @@ public class EnemyAI : MonoBehaviour
 
     private void Update()
     {
-        // Düşman öldüyse hiçbir şey yapma
         if (selfHealth != null && selfHealth.currentHealth <= 0)
             return;
 
-        // Hedef öldüyse / yok olduysa sıfırla
         if (currentTargetHealth == null || currentTargetHealth.currentHealth <= 0)
         {
             currentTarget = null;
             currentTargetHealth = null;
         }
 
-        // Belirli aralıklarla hedef güncelle
         retargetTimer += Time.deltaTime;
         if (retargetTimer >= retargetInterval)
         {
@@ -90,16 +99,24 @@ public class EnemyAI : MonoBehaviour
 
         float dist = toTarget.magnitude;
 
-        // 1) Hedefe doğru yürü
+        // 1) Hedefe doğru yürü (duvara girmeyecek şekilde)
         if (dist > stopDistance)
         {
-            Vector3 moveDir = toTarget.normalized;
-            transform.position += moveDir * moveSpeed * Time.deltaTime;
+            Vector3 moveDir = (dist > 0.0001f) ? (toTarget / dist) : Vector3.zero;
+            Vector3 desiredMove = moveDir * moveSpeed * Time.deltaTime;
 
-            if (moveDir.sqrMagnitude > 0.001f)
+            Vector3 finalMove = ClipMoveByCapsuleCast(desiredMove);
+
+            if (finalMove.sqrMagnitude > 0f)
             {
-                Quaternion lookRot = Quaternion.LookRotation(moveDir);
-                transform.rotation = Quaternion.Slerp(transform.rotation, lookRot, 10f * Time.deltaTime);
+                rb.MovePosition(rb.position + finalMove);
+
+                // Bakış yönü
+                if (moveDir.sqrMagnitude > 0.001f)
+                {
+                    Quaternion lookRot = Quaternion.LookRotation(moveDir);
+                    transform.rotation = Quaternion.Slerp(transform.rotation, lookRot, 10f * Time.deltaTime);
+                }
             }
         }
 
@@ -113,11 +130,42 @@ public class EnemyAI : MonoBehaviour
                 currentTargetHealth.TakeDamage(attackDamage);
             }
         }
-        else
+    }
+
+    /// <summary>
+    /// Enemy capsule'ını kullanarak duvar/building içine girmeden hareketi kırpar.
+    /// </summary>
+    private Vector3 ClipMoveByCapsuleCast(Vector3 desiredMove)
+    {
+        if (desiredMove.sqrMagnitude < 0.0000001f)
+            return Vector3.zero;
+
+        Vector3 dir = desiredMove.normalized;
+        float distance = desiredMove.magnitude;
+
+        // Capsule world noktaları
+        // Unity capsule collider local axis'i: direction (0=X,1=Y,2=Z)
+        // Sende çoğunlukla Y ekseni olur. Biz güvenli şekilde hesaplayalım.
+        float radius = Mathf.Max(0.01f, cap.radius * Mathf.Max(transform.lossyScale.x, transform.lossyScale.z));
+        float height = Mathf.Max(radius * 2f, cap.height * transform.lossyScale.y);
+
+        Vector3 center = transform.TransformPoint(cap.center);
+
+        // Y eksenli capsule varsayımı (senin enemylerde öyle)
+        float half = Mathf.Max(0f, (height * 0.5f) - radius);
+
+        Vector3 p1 = center + Vector3.up * half;
+        Vector3 p2 = center - Vector3.up * half;
+
+        // Kısa mesafe cast
+        if (Physics.CapsuleCast(p2, p1, radius, dir, out RaycastHit hit, distance + collisionSkin, obstacleMask, QueryTriggerInteraction.Ignore))
         {
-            // istersen menzil dışına çıkınca sıfırlayabilirsin
-            // attackTimer = 0f;
+            // Duvara girmeden en fazla şu kadar ilerle
+            float allowed = Mathf.Max(0f, hit.distance - collisionSkin);
+            return dir * allowed;
         }
+
+        return desiredMove;
     }
 
     private void UpdateTarget()
@@ -175,7 +223,6 @@ public class EnemyAI : MonoBehaviour
         }
         else
         {
-            // Yakında başka bina yoksa ana hedef base
             if (baseTarget != null)
             {
                 currentTarget = baseTarget;
@@ -202,7 +249,6 @@ public class EnemyAI : MonoBehaviour
 
     private void OnCollisionEnter(Collision collision)
     {
-        // Duvara çarptıysa ve duvar yaşıyorsa bu duvarı hedef al
         if (collision.collider != null && collision.collider.CompareTag(wallTag))
         {
             Transform wall = collision.collider.transform;

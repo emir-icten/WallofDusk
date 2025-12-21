@@ -4,19 +4,25 @@ public class PlayerMage : MonoBehaviour
 {
     [Header("Hedef Bulma")]
     public float attackRange = 14f;
-    public LayerMask enemyMask;         // Enemy layer seçili olmalı
+    public LayerMask enemyMask;
     public string enemyTag = "Enemy";
 
     [Header("Büyü / Projectile")]
     public PlayerMageProjectile projectilePrefab;
-    public Transform castPoint;         // Mage_CastPoint
+    public Transform castPoint;
     public float projectileSpeed = 18f;
     public float attackCooldown = 1.8f;
     public int damage = 35;
     public float explosionRadius = 2.5f;
 
-    [Header("AOE Damage Falloff")]
-    [Range(0.1f, 1f)] public float edgeDamageMultiplier = 0.5f;
+    [Range(0.1f, 1f)]
+    public float edgeDamageMultiplier = 0.5f;
+
+    [Tooltip("Projectile'ın castPoint'ten ne kadar önde doğacağı (Base'e çarpmamak için)")]
+    public float spawnForwardOffset = 0.35f;
+
+    [Tooltip("Projectile'ın ne kadar yukarıda doğacağı (zemin/Base çarpışmalarını azaltır)")]
+    public float spawnUpOffset = 1.0f;
 
     [Header("Dönüş")]
     public bool rotateTowardsTarget = true;
@@ -25,111 +31,103 @@ public class PlayerMage : MonoBehaviour
     [Header("Animasyon")]
     public Animator animator;
     public string castTrigger = "Cast";
-
-    [Tooltip("Animation Event kullanmıyorsan, büyü bu gecikmeyle çıkar.")]
     public float castDelay = 0.15f;
-
-    [Tooltip("Cast animinde Animation Event (AnimEvent_Fire) kullanıyorsan bunu aç.")]
     public bool useAnimationEvent = true;
 
+    // Runtime
     Transform currentTarget;
     float nextAttackTime;
+    bool isCasting;
 
-    // Aynı cast içinde iki kez büyü atmasın diye
-    bool firedThisCast;
-
-    void Awake()
+    void Reset()
     {
-        if (animator == null)
-            animator = GetComponentInChildren<Animator>();
+        animator = GetComponentInChildren<Animator>();
     }
 
     void Update()
     {
-        currentTarget = FindClosestEnemy();
-
-        if (currentTarget == null)
+        // Güvenlik kontrolleri
+        if (animator == null || castPoint == null || projectilePrefab == null)
             return;
 
-        if (rotateTowardsTarget)
-            RotateTowards(currentTarget);
+        // Hedef seç
+        currentTarget = FindClosestEnemyInRange();
 
-        if (Time.time < nextAttackTime)
-            return;
+        // Hedefe doğru dön
+        if (rotateTowardsTarget && currentTarget != null)
+            RotateTowards(currentTarget.position);
 
-        // menzildeyse saldır
-        float distSqr = (currentTarget.position - transform.position).sqrMagnitude;
-        if (distSqr <= attackRange * attackRange)
-        {
-            StartCast();
-        }
+        // Saldırı koşulları
+        if (currentTarget == null) return;
+        if (Time.time < nextAttackTime) return;
+        if (isCasting) return;
+
+        StartCast();
     }
 
     void StartCast()
     {
+        isCasting = true;
         nextAttackTime = Time.time + attackCooldown;
-        firedThisCast = false;
 
-        if (animator != null)
-        {
-            animator.ResetTrigger(castTrigger);
+        // Animasyonu tetikle
+        if (!string.IsNullOrEmpty(castTrigger))
             animator.SetTrigger(castTrigger);
-        }
 
-        // Animation Event kullanmıyorsan gecikmeyle fırlat
+        // Eğer anim event kullanmıyorsak, delay ile ateşle
         if (!useAnimationEvent)
-        {
-            CancelInvoke(nameof(FireFromDelay));
             Invoke(nameof(FireFromDelay), castDelay);
-        }
     }
 
     void FireFromDelay()
     {
-        if (firedThisCast) return;
-        firedThisCast = true;
+        // Delay geldiğinde hedef kaçmış olabilir
+        if (currentTarget != null)
+            FireAt(currentTarget);
 
-        FireAt(currentTarget);
+        isCasting = false;
     }
 
     /// <summary>
-    /// Cast anim clipine event olarak bunu koy: AnimEvent_Fire()
+    /// Animation Event veya Relay tarafından çağrılır.
+    /// Cast anim klibinde AnimEvent_Fire event'i bu fonksiyona bağlanmalı.
     /// </summary>
     public void AnimEvent_Fire()
     {
-        if (!useAnimationEvent) return; // delay modundaysan event çalışmasın
-        if (firedThisCast) return;
+        if (!useAnimationEvent)
+            return; // yanlışlıkla iki kez ateşlemeyi engeller
 
-        firedThisCast = true;
-        FireAt(currentTarget);
+        if (currentTarget != null)
+            FireAt(currentTarget);
+
+        isCasting = false;
     }
 
     void FireAt(Transform target)
     {
-        if (projectilePrefab == null)
-        {
-            Debug.LogWarning("[PlayerMage] projectilePrefab boş.");
+        if (projectilePrefab == null || castPoint == null || target == null)
             return;
-        }
-        if (castPoint == null)
-        {
-            Debug.LogWarning("[PlayerMage] castPoint boş. Mage_CastPoint atamalısın.");
-            return;
-        }
-        if (target == null) return;
 
+        // Spawn pozisyonu: castPoint'in önüne ve yukarısına al (Base/Sato çarpışmasını azaltır)
+        Vector3 spawnPos = castPoint.position
+                         + castPoint.forward * spawnForwardOffset
+                         + castPoint.up * spawnUpOffset;
 
+        // Hedefin göğsüne doğru nişan al (Y sıfırlama yok)
+        Vector3 targetPos = target.position + Vector3.up * 1.0f;
+        Vector3 dir = targetPos - spawnPos;
 
-        Debug.Log($"[Mage] FireAt! target={(target ? target.name : "NULL")} castPoint={(castPoint ? castPoint.name : "NULL")} prefab={(projectilePrefab ? projectilePrefab.name : "NULL")}");
-
-        Vector3 dir = target.position - castPoint.position;
-        dir.y = 0f;
-
-        if (dir.sqrMagnitude < 0.001f) return;
+        if (dir.sqrMagnitude < 0.0001f)
+            dir = castPoint.forward;
 
         Quaternion rot = Quaternion.LookRotation(dir.normalized, Vector3.up);
-        PlayerMageProjectile proj = Instantiate(projectilePrefab, castPoint.position, rot);
 
+        Debug.Log($"[Mage] FireAt! target={target.name} spawnPos={spawnPos} dir={dir.normalized}");
+
+        // Instantiate
+        PlayerMageProjectile proj = Instantiate(projectilePrefab, spawnPos, rot);
+
+        // Init: owner çarpışmasını ignore eden sistem + hasar parametreleri
         proj.Init(
             owner: transform,
             speed: projectileSpeed,
@@ -141,41 +139,42 @@ public class PlayerMage : MonoBehaviour
         );
     }
 
-    Transform FindClosestEnemy()
+    Transform FindClosestEnemyInRange()
     {
-        Collider[] hits = Physics.OverlapSphere(transform.position, attackRange, enemyMask, QueryTriggerInteraction.Ignore);
-        if (hits == null || hits.Length == 0) return null;
+        Collider[] hits = Physics.OverlapSphere(
+            transform.position,
+            attackRange,
+            enemyMask,
+            QueryTriggerInteraction.Ignore
+        );
 
-        float best = float.MaxValue;
-        Transform bestT = null;
+        Transform best = null;
+        float bestDist = float.MaxValue;
 
         for (int i = 0; i < hits.Length; i++)
         {
             if (hits[i] == null) continue;
+            if (!hits[i].CompareTag(enemyTag)) continue;
 
-            Transform t = hits[i].transform;
-            if (!t.CompareTag(enemyTag)) continue;
-
-            float d = (t.position - transform.position).sqrMagnitude;
-            if (d < best)
+            float d = (hits[i].transform.position - transform.position).sqrMagnitude;
+            if (d < bestDist)
             {
-                best = d;
-                bestT = t;
+                bestDist = d;
+                best = hits[i].transform;
             }
         }
 
-        return bestT;
+        return best;
     }
 
-    void RotateTowards(Transform target)
+    void RotateTowards(Vector3 worldPos)
     {
-        Vector3 dir = target.position - transform.position;
-        dir.y = 0f;
+        Vector3 flatDir = worldPos - transform.position;
+        flatDir.y = 0f;
+        if (flatDir.sqrMagnitude < 0.0001f) return;
 
-        if (dir.sqrMagnitude < 0.001f) return;
-
-        Quaternion lookRot = Quaternion.LookRotation(dir.normalized, Vector3.up);
-        transform.rotation = Quaternion.Slerp(transform.rotation, lookRot, rotateSpeed * Time.deltaTime);
+        Quaternion targetRot = Quaternion.LookRotation(flatDir.normalized, Vector3.up);
+        transform.rotation = Quaternion.Slerp(transform.rotation, targetRot, rotateSpeed * Time.deltaTime);
     }
 
 #if UNITY_EDITOR
@@ -186,3 +185,4 @@ public class PlayerMage : MonoBehaviour
     }
 #endif
 }
+    
