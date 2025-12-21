@@ -2,23 +2,38 @@ using UnityEngine;
 
 public class Health : MonoBehaviour, IPoolable
 {
-    [Header("Can Ayarları")]
+    [Header("Health")]
     public int maxHealth = 100;
-    [HideInInspector] public int currentHealth;
-    public bool destroyOnDeath = true;
+    public int currentHealth;
 
-    [Header("Özel Bayraklar")]
-    [Tooltip("Bu obje ölürse Game Over olsun (Base vs.)")]
+    [Header("Death Settings")]
+    public bool destroyOnDeath = true;
     public bool isBase = false;
+
+    [Header("Hit Feedback")]
+    public bool playHitAnimation = true;
+
+    Animator animator;
 
     private void Awake()
     {
         currentHealth = maxHealth;
+        animator = GetComponentInChildren<Animator>();
     }
 
     public void TakeDamage(int amount)
     {
+        if (amount <= 0) return;
+
         currentHealth -= amount;
+
+        // 🔹 DAMAGE POPUP
+        if (DamagePopupSpawner.Instance != null)
+            DamagePopupSpawner.Instance.Spawn(amount, transform.position);
+
+        // 🔹 HIT ANIMATION
+        if (playHitAnimation && animator != null)
+            animator.SetTrigger("Hit");
 
         if (currentHealth <= 0)
         {
@@ -29,18 +44,20 @@ public class Health : MonoBehaviour, IPoolable
 
     private void Die()
     {
-        Debug.Log($"{name} öldü. isBase = {isBase}");
-
-        // Base ölürse oyun biter
+        // BASE ölürse oyun biter
         if (isBase && FlowUI.Instance != null)
         {
-            Debug.Log("FlowUI.OnGameOver() çağrıldı");
             FlowUI.Instance.OnGameOver();
             return;
         }
 
-        // Enemy vb. objeler ölünce: pooled ise havuza dön, değilse destroy
-        if (destroyOnDeath && !isBase)
+        // 🔹 ENEMY ÖLÜRSE COIN
+        if (CompareTag("Enemy"))
+        {
+            ResourceManager.AddCoin(1);
+        }
+
+        if (!isBase && destroyOnDeath)
         {
             if (PoolManager.Instance != null && GetComponent<PooledObject>() != null)
                 PoolManager.Instance.Despawn(gameObject);
@@ -49,7 +66,6 @@ public class Health : MonoBehaviour, IPoolable
         }
     }
 
-    // Pool’dan tekrar çıkınca can reset
     public void OnSpawned()
     {
         currentHealth = maxHealth;
@@ -57,6 +73,5 @@ public class Health : MonoBehaviour, IPoolable
 
     public void OnDespawned()
     {
-        // İstersen burada VFX/Bar reset ekleyebilirsin.
     }
 }

@@ -488,6 +488,7 @@ GameObject:
   - component: {fileID: 2580200227326185331}
   - component: {fileID: 5711504554201915846}
   - component: {fileID: 4652359842594983062}
+  - component: {fileID: 308665104936110231}
   m_Layer: 7
   m_Name: Enemy
   m_TagString: Enemy
@@ -504,7 +505,7 @@ Transform:
   m_GameObject: {fileID: 270663546300681956}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -8.85, y: 1.39, z: -2.652946}
+  m_LocalPosition: {x: -19.238821, y: 0, z: -12.0360565}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -598,7 +599,7 @@ MonoBehaviour:
   obstacleMask:
     serializedVersion: 2
     m_Bits: 576
-  collisionSkin: 0.03
+  collisionSkin: 0.06
 --- !u!114 &5711504554201915846
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -615,6 +616,7 @@ MonoBehaviour:
   currentHealth: 0
   destroyOnDeath: 1
   isBase: 0
+  playHitAnimation: 1
 --- !u!114 &4652359842594983062
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -630,6 +632,21 @@ MonoBehaviour:
   burnDamagePerTick: 2
   tickInterval: 0.2
   disableAIWhileBurning: 0
+--- !u!114 &308665104936110231
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 270663546300681956}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4931d361eec187a4baaf519ecc70fb69, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  damage: 5
+  interval: 1
+  playerTag: Player
 --- !u!1 &5501581805455656651
 GameObject:
   m_ObjectHideFlags: 0

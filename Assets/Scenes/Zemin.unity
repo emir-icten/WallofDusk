@@ -442,6 +442,10 @@ PrefabInstance:
       propertyPath: lookAheadDst
       value: 3.15
       objectReference: {fileID: 0}
+    - target: {fileID: 2034092688911175816, guid: 787d07c38aa18154f9d6e93a42a8b8ba, type: 3}
+      propertyPath: occluderMask.m_Bits
+      value: 576
+      objectReference: {fileID: 0}
     - target: {fileID: 3637544538256601341, guid: 787d07c38aa18154f9d6e93a42a8b8ba, type: 3}
       propertyPath: m_Name
       value: Main Camera
@@ -635,6 +639,10 @@ PrefabInstance:
       value: 
       objectReference: {fileID: 820690845}
     - target: {fileID: 3200938245233145769, guid: a7f75235e288ae1468c717ae6d273108, type: 3}
+      propertyPath: maxAliveEnemies
+      value: 15
+      objectReference: {fileID: 0}
+    - target: {fileID: 3200938245233145769, guid: a7f75235e288ae1468c717ae6d273108, type: 3}
       propertyPath: playerTransform
       value: 
       objectReference: {fileID: 0}
@@ -644,7 +652,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 3200938245233145769, guid: a7f75235e288ae1468c717ae6d273108, type: 3}
       propertyPath: maxSpawnPerNight
-      value: 100
+      value: 150
       objectReference: {fileID: 0}
     - target: {fileID: 3200938245233145769, guid: a7f75235e288ae1468c717ae6d273108, type: 3}
       propertyPath: minSpawnInterval
@@ -1268,6 +1276,67 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f4688fdb7df04437aeb418b961361dc5, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+--- !u!1001 &7377386671806257547
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 0}
+    m_Modifications:
+    - target: {fileID: 1476697666672965504, guid: 988e70807b869084cb00e358b3a45685, type: 3}
+      propertyPath: popupPrefab
+      value: 
+      objectReference: {fileID: 3663941480975953766, guid: 8906418076a3e564885290358af32d10, type: 3}
+    - target: {fileID: 6727013274348769594, guid: 988e70807b869084cb00e358b3a45685, type: 3}
+      propertyPath: m_Name
+      value: DamagePopupSpawner
+      objectReference: {fileID: 0}
+    - target: {fileID: 7178692964692418574, guid: 988e70807b869084cb00e358b3a45685, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: -17.133137
+      objectReference: {fileID: 0}
+    - target: {fileID: 7178692964692418574, guid: 988e70807b869084cb00e358b3a45685, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7178692964692418574, guid: 988e70807b869084cb00e358b3a45685, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: -15.104822
+      objectReference: {fileID: 0}
+    - target: {fileID: 7178692964692418574, guid: 988e70807b869084cb00e358b3a45685, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 7178692964692418574, guid: 988e70807b869084cb00e358b3a45685, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7178692964692418574, guid: 988e70807b869084cb00e358b3a45685, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7178692964692418574, guid: 988e70807b869084cb00e358b3a45685, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7178692964692418574, guid: 988e70807b869084cb00e358b3a45685, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7178692964692418574, guid: 988e70807b869084cb00e358b3a45685, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7178692964692418574, guid: 988e70807b869084cb00e358b3a45685, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: 988e70807b869084cb00e358b3a45685, type: 3}
 --- !u!1001 &7415189136610854820
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -1537,3 +1606,4 @@ SceneRoots:
   - {fileID: 5864019123305841227}
   - {fileID: 1270139490}
   - {fileID: 866601999018231177}
+  - {fileID: 7377386671806257547}

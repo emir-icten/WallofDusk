@@ -43,6 +43,25 @@ public class PlayerHarvestTool : MonoBehaviour
         EquipBow();
     }
 
+    private void OnEnable()
+    {
+        // ✅ Gece olunca harvest'ı zorla kapat (inputLocked bug fix)
+        if (TimeManager.Instance != null)
+            TimeManager.Instance.OnNightStart += ForceStopHarvestOnNight;
+    }
+
+    private void OnDisable()
+    {
+        if (TimeManager.Instance != null)
+            TimeManager.Instance.OnNightStart -= ForceStopHarvestOnNight;
+    }
+
+    private void ForceStopHarvestOnNight()
+    {
+        if (harvesting)
+            OnHarvestStop();
+    }
+
     void Update()
     {
         if (!harvesting) return;
