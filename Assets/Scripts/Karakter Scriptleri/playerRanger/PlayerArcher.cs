@@ -2,201 +2,214 @@ using UnityEngine;
 
 public class PlayerArcher : MonoBehaviour
 {
-    [Header("Ok Ayarları")]
-    public GameObject arrowPrefab;
-    public Transform shootPoint;
-    public float attackRange = 15f;
-    public float fireRate = 0.25f;
-
-    [Header("Animasyon")]
+    [Header("Refs")]
     public Animator animator;
+    public Transform rotateRoot;
+    public Transform shootPoint;
+
+    [Header("Targeting")]
+    public LayerMask enemyMask;
+    public string enemyTag = "Enemy";
+    public float acquireRange = 16f;
+    public bool lockTargetDuringAttack = true;
+
+    [Header("Attack")]
+    public GameObject arrowPrefab;
+    public float attackCooldown = 0.45f;
+    public int baseArrowDamage = 10;
+
+    [Header("Rotation While Attacking")]
+    public bool rotateToTargetWhileAttacking = true;
+    public float attackTurnSpeed = 18f;
+    public float snapAngleThreshold = 35f;
+
+    [Header("Animation")]
     public string drawTrigger = "Draw";
     public string shootTrigger = "Shoot";
+    public float drawTime = 0.28f;
+    public bool useAnimationEvent = false;
 
-    [Tooltip("DrawBow klibinin süresi kadar. İlk atış bundan sonra başlar.")]
-    public float drawDuration = 0.35f;
+    [Header("Global Stats (Opsiyonel)")]
+    public PlayerStatsSO globalStats;
+    public bool autoFindGlobalStats = true;
 
-    [Header("Üst Gövde Aim (BlendTree)")]
-    public string aimParam = "Aim";      // Float param (BlendTree 1D)
-    public float aimAngleMax = 60f;      // 60 derece = Aim +-1
-    public float aimSmooth = 10f;        // Yumuşatma hızı
+    [Header("Debug")]
+    public bool drawDebug = false;
 
-    [Header("Hedefe Bakma (Root Dönüş)")]
-    public bool rotateTowardsTarget = true;
-    public float rotateSpeed = 10f;
+    private float _nextAttackTime;
+    private Transform _target;
+    private bool _isAttacking;
 
-    [Header("Görüş Hattı Ayarı")]
-    [Range(0f, 2f)] public float targetHeightOffset = 1.5f;
+    private readonly Collider[] _overlaps = new Collider[64];
 
-    private float nextFireTime = 0f;
-    private bool hadTarget = false;
-
-    private float aimValue = 0f;
-
-    void Awake()
+    private void Awake()
     {
-        if (animator == null)
-            animator = GetComponentInChildren<Animator>();
+        if (!animator) animator = GetComponentInChildren<Animator>();
+        if (!rotateRoot) rotateRoot = transform;
+        if (!shootPoint) shootPoint = rotateRoot;
+
+        if (autoFindGlobalStats && globalStats == null)
+        {
+            var all = Resources.FindObjectsOfTypeAll<PlayerStatsSO>();
+            if (all != null && all.Length > 0) globalStats = all[0];
+        }
     }
 
-    void Update()
+    private void Update()
     {
+        CleanupDeadTarget();
+
+        if (_isAttacking && rotateToTargetWhileAttacking && _target != null)
+            RotateToward(_target, attackTurnSpeed, snapAngleThreshold);
+
+        if (Time.time < _nextAttackTime) return;
+
+        Transform candidate = _target;
+
+        if (!_isAttacking || !lockTargetDuringAttack || candidate == null)
+            candidate = AcquireTarget();
+
+        if (candidate == null)
+            return; // ✅ hedef yoksa anim yok
+
+        _target = candidate;
+        StartAttack();
+    }
+
+    private void CleanupDeadTarget()
+    {
+        if (_target == null) return;
+        Health h = _target.GetComponentInParent<Health>();
+        if (h == null || h.currentHealth <= 0) _target = null;
+    }
+
+    private void StartAttack()
+    {
+        if (_target == null) return; // ✅ güvenlik
+
+        _nextAttackTime = Time.time + attackCooldown;
+        _isAttacking = true;
+
+        if (rotateToTargetWhileAttacking)
+            RotateToward(_target, attackTurnSpeed * 2f, snapAngleThreshold);
+
+        if (animator) animator.SetTrigger(drawTrigger);
+
+        if (!useAnimationEvent)
+        {
+            CancelInvoke(nameof(ShootNow));
+            Invoke(nameof(ShootNow), drawTime);
+        }
+    }
+
+    public void AnimEvent_Shoot() => ShootNow();
+
+    private void ShootNow()
+    {
+        // ✅ draw süresinde hedef öldüyse, shoot iptal
+        CleanupDeadTarget();
+        if (_target == null)
+        {
+            _isAttacking = false;
+            return;
+        }
+
         if (arrowPrefab == null || shootPoint == null)
         {
-            Debug.LogWarning("PlayerArcher: arrowPrefab veya shootPoint atanmadı!", this);
-            SetAim(0f);
-            hadTarget = false;
+            _isAttacking = false;
             return;
         }
 
-        Transform target = FindLowestHealthVisibleEnemyInRange();
-        bool hasTarget = target != null;
+        if (animator) animator.SetTrigger(shootTrigger);
 
-        // Hedef yoksa: aim sıfırla, state resetle
-        if (!hasTarget)
+        GameObject arrowObj;
+        if (PoolManager.Instance != null)
+            arrowObj = PoolManager.Instance.Spawn(arrowPrefab, shootPoint.position, Quaternion.identity);
+        else
+            arrowObj = Instantiate(arrowPrefab, shootPoint.position, Quaternion.identity);
+
+        if (arrowObj != null)
         {
-            hadTarget = false;
-            SetAim(0f);
-            return;
-        }
+            Vector3 dir = (_target.position - shootPoint.position);
+            dir.y = 0f;
+            if (dir.sqrMagnitude < 0.001f) dir = shootPoint.forward;
 
-        // Üst gövde aim (hedef sağ/sol)
-        UpdateAimTowards(target);
+            arrowObj.transform.rotation = Quaternion.LookRotation(dir.normalized, Vector3.up);
 
-        // Root dönüş (istersen kapatabilirsin, sadece üst gövdeyle de olur)
-        if (rotateTowardsTarget)
-            RotateRootTowards(target);
-
-        // İlk kez hedef gördüysek: Draw 1 kere
-        if (!hadTarget)
-        {
-            hadTarget = true;
-
-            if (animator != null)
+            ArrowProjectile proj = arrowObj.GetComponent<ArrowProjectile>();
+            if (proj != null)
             {
-                animator.ResetTrigger(drawTrigger);
-                animator.SetTrigger(drawTrigger);
+                proj.damage = GetFinalDamage();
+                proj.target = _target;
             }
-
-            nextFireTime = Time.time + drawDuration;
-            return;
         }
 
-        // Seri atış
-        if (Time.time >= nextFireTime)
+        _isAttacking = false;
+    }
+
+    private Transform AcquireTarget()
+    {
+        Vector3 center = rotateRoot.position;
+        int count = Physics.OverlapSphereNonAlloc(center, acquireRange, _overlaps, enemyMask, QueryTriggerInteraction.Ignore);
+
+        float best = float.MaxValue;
+        Transform bestT = null;
+
+        for (int i = 0; i < count; i++)
         {
-            if (animator != null)
-            {
-                animator.ResetTrigger(shootTrigger);
-                animator.SetTrigger(shootTrigger);
-            }
+            Collider c = _overlaps[i];
+            if (!c) continue;
 
-            ShootAt(target);
-            nextFireTime = Time.time + fireRate;
-        }
-    }
+            Transform t = c.transform;
+            Transform enemyRoot = t.CompareTag(enemyTag) ? t : (t.parent != null && t.parent.CompareTag(enemyTag) ? t.parent : null);
+            if (enemyRoot == null) continue;
 
-    void UpdateAimTowards(Transform target)
-    {
-        Vector3 toTarget = target.position - transform.position;
-        toTarget.y = 0f;
-
-        if (toTarget.sqrMagnitude < 0.0001f)
-        {
-            SetAim(0f);
-            return;
-        }
-
-        float signedAngle = Vector3.SignedAngle(transform.forward, toTarget.normalized, Vector3.up);
-        float targetAim = Mathf.Clamp(signedAngle / aimAngleMax, -1f, 1f);
-
-        aimValue = Mathf.Lerp(aimValue, targetAim, aimSmooth * Time.deltaTime);
-        SetAim(aimValue);
-    }
-
-    void SetAim(float v)
-    {
-        if (animator == null) return;
-        animator.SetFloat(aimParam, v);
-    }
-
-    void RotateRootTowards(Transform target)
-    {
-        Vector3 dir = target.position - transform.position;
-        dir.y = 0f;
-
-        if (dir.sqrMagnitude < 0.001f) return;
-
-        Quaternion lookRot = Quaternion.LookRotation(dir.normalized, Vector3.up);
-        transform.rotation = Quaternion.Slerp(transform.rotation, lookRot, rotateSpeed * Time.deltaTime);
-    }
-
-    void ShootAt(Transform target)
-    {
-        Vector3 dir = target.position - shootPoint.position;
-        dir.y = 0f;
-        if (dir.sqrMagnitude < 0.001f) return;
-
-        Quaternion rot = Quaternion.LookRotation(dir.normalized, Vector3.up);
-        GameObject arrowObj = Instantiate(arrowPrefab, shootPoint.position, rot);
-
-        ArrowProjectile proj = arrowObj.GetComponent<ArrowProjectile>();
-        if (proj != null) proj.target = target;
-    }
-
-    // En düşük can yüzdesi + line of sight
-    Transform FindLowestHealthVisibleEnemyInRange()
-    {
-        Collider[] hits = Physics.OverlapSphere(transform.position, attackRange);
-
-        Transform bestTarget = null;
-        float lowestHealthRatio = 1.1f;
-        float bestDistSqr = Mathf.Infinity;
-
-        foreach (var hit in hits)
-        {
-            if (!hit.CompareTag("Enemy")) continue;
-
-            Health h = hit.GetComponent<Health>();
+            Health h = enemyRoot.GetComponentInParent<Health>();
             if (h == null || h.currentHealth <= 0) continue;
 
-            if (!HasLineOfSight(hit.transform)) continue;
-
-            float ratio = (float)h.currentHealth / h.maxHealth;
-            float distSqr = (hit.transform.position - transform.position).sqrMagnitude;
-
-            if (ratio < lowestHealthRatio ||
-                (Mathf.Approximately(ratio, lowestHealthRatio) && distSqr < bestDistSqr))
+            float d = (enemyRoot.position - center).sqrMagnitude;
+            if (d < best)
             {
-                lowestHealthRatio = ratio;
-                bestDistSqr = distSqr;
-                bestTarget = hit.transform;
+                best = d;
+                bestT = enemyRoot;
             }
         }
 
-        return bestTarget;
+        return bestT;
     }
 
-    bool HasLineOfSight(Transform enemy)
+    private void RotateToward(Transform target, float speed, float snapThresholdDeg)
     {
-        Vector3 origin = shootPoint.position;
-        Vector3 targetPos = enemy.position + Vector3.up * targetHeightOffset;
+        Vector3 dir = target.position - rotateRoot.position;
+        dir.y = 0f;
+        if (dir.sqrMagnitude < 0.0001f) return;
 
-        Vector3 dir = targetPos - origin;
-        float dist = dir.magnitude;
+        Quaternion desired = Quaternion.LookRotation(dir.normalized, Vector3.up);
 
-        if (dist <= 0.01f) return true;
-        dir /= dist;
+        if (snapThresholdDeg > 0f)
+        {
+            float angle = Quaternion.Angle(rotateRoot.rotation, desired);
+            if (angle >= snapThresholdDeg)
+            {
+                rotateRoot.rotation = desired;
+                return;
+            }
+        }
 
-        if (Physics.Raycast(origin, dir, out RaycastHit hit, dist, ~0, QueryTriggerInteraction.Ignore))
-            return hit.collider.CompareTag("Enemy");
-
-        return true;
+        rotateRoot.rotation = Quaternion.Slerp(rotateRoot.rotation, desired, speed * Time.deltaTime);
     }
 
-    void OnDrawGizmosSelected()
+    private int GetFinalDamage()
     {
+        float mult = 1f;
+        if (globalStats != null) mult += globalStats.globalDamageMultiplier;
+        return Mathf.Max(1, Mathf.RoundToInt(baseArrowDamage * mult));
+    }
+
+    private void OnDrawGizmosSelected()
+    {
+        if (!drawDebug) return;
         Gizmos.color = Color.yellow;
-        Gizmos.DrawWireSphere(transform.position, attackRange);
+        Gizmos.DrawWireSphere(transform.position, acquireRange);
     }
 }

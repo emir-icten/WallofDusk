@@ -2,187 +2,204 @@ using UnityEngine;
 
 public class PlayerMage : MonoBehaviour
 {
-    [Header("Hedef Bulma")]
-    public float attackRange = 14f;
+    [Header("Refs")]
+    public Animator animator;
+    public Transform rotateRoot;
+    public Transform castPoint;
+
+    [Header("Targeting")]
     public LayerMask enemyMask;
     public string enemyTag = "Enemy";
+    public float acquireRange = 14f;
+    public bool lockTargetDuringAttack = true;
 
-    [Header("Büyü / Projectile")]
+    [Header("Attack")]
     public PlayerMageProjectile projectilePrefab;
-    public Transform castPoint;
+    public float attackCooldown = 1.6f;
+    public int baseDamage = 35;
     public float projectileSpeed = 18f;
-    public float attackCooldown = 1.8f;
-    public int damage = 35;
     public float explosionRadius = 2.5f;
 
-    [Range(0.1f, 1f)]
-    public float edgeDamageMultiplier = 0.5f;
+    [Header("Rotation While Casting")]
+    public bool rotateToTargetWhileAttacking = true;
+    public float attackTurnSpeed = 16f;
+    public float snapAngleThreshold = 35f;
 
-    [Tooltip("Projectile'ın castPoint'ten ne kadar önde doğacağı (Base'e çarpmamak için)")]
-    public float spawnForwardOffset = 0.35f;
-
-    [Tooltip("Projectile'ın ne kadar yukarıda doğacağı (zemin/Base çarpışmalarını azaltır)")]
-    public float spawnUpOffset = 1.0f;
-
-    [Header("Dönüş")]
-    public bool rotateTowardsTarget = true;
-    public float rotateSpeed = 12f;
-
-    [Header("Animasyon")]
-    public Animator animator;
-    public string castTrigger = "Cast";
-    public float castDelay = 0.15f;
+    [Header("Animation")]
+    public string castTrigger = "Shoot";
     public bool useAnimationEvent = true;
+    public float castDelay = 0.2f;
+    public float castWindow = 0.35f;
 
-    // Runtime
-    Transform currentTarget;
-    float nextAttackTime;
-    bool isCasting;
+    [Header("Global Stats (Opsiyonel)")]
+    public PlayerStatsSO globalStats;
+    public bool autoFindGlobalStats = true;
 
-    void Reset()
+    [Header("Debug")]
+    public bool drawDebug = false;
+
+    private float _nextAttackTime;
+    private Transform _target;
+    private bool _isCasting;
+
+    private readonly Collider[] _overlaps = new Collider[64];
+
+    private void Awake()
     {
-        animator = GetComponentInChildren<Animator>();
+        if (!animator) animator = GetComponentInChildren<Animator>();
+        if (!rotateRoot) rotateRoot = transform;
+        if (!castPoint) castPoint = rotateRoot;
+
+        if (autoFindGlobalStats && globalStats == null)
+        {
+            var all = Resources.FindObjectsOfTypeAll<PlayerStatsSO>();
+            if (all != null && all.Length > 0) globalStats = all[0];
+        }
     }
 
-    void Update()
+    private void Update()
     {
-        // Güvenlik kontrolleri
-        if (animator == null || castPoint == null || projectilePrefab == null)
-            return;
+        CleanupDeadTarget();
 
-        // Hedef seç
-        currentTarget = FindClosestEnemyInRange();
+        if (_isCasting && rotateToTargetWhileAttacking && _target != null)
+            RotateToward(_target, attackTurnSpeed, snapAngleThreshold);
 
-        // Hedefe doğru dön
-        if (rotateTowardsTarget && currentTarget != null)
-            RotateTowards(currentTarget.position);
+        if (Time.time < _nextAttackTime) return;
 
-        // Saldırı koşulları
-        if (currentTarget == null) return;
-        if (Time.time < nextAttackTime) return;
-        if (isCasting) return;
+        Transform candidate = _target;
 
+        if (!_isCasting || !lockTargetDuringAttack || candidate == null)
+            candidate = AcquireTarget();
+
+        if (candidate == null)
+            return; // ✅ hedef yoksa cast anim yok
+
+        _target = candidate;
         StartCast();
     }
 
-    void StartCast()
+    private void CleanupDeadTarget()
     {
-        isCasting = true;
-        nextAttackTime = Time.time + attackCooldown;
+        if (_target == null) return;
+        Health h = _target.GetComponentInParent<Health>();
+        if (h == null || h.currentHealth <= 0) _target = null;
+    }
 
-        // Animasyonu tetikle
-        if (!string.IsNullOrEmpty(castTrigger))
-            animator.SetTrigger(castTrigger);
+    private void StartCast()
+    {
+        if (_target == null) return; // ✅ güvenlik
 
-        // Eğer anim event kullanmıyorsak, delay ile ateşle
+        _nextAttackTime = Time.time + attackCooldown;
+        _isCasting = true;
+
+        if (rotateToTargetWhileAttacking)
+            RotateToward(_target, attackTurnSpeed * 2f, snapAngleThreshold);
+
+        if (animator) animator.SetTrigger(castTrigger);
+
         if (!useAnimationEvent)
-            Invoke(nameof(FireFromDelay), castDelay);
-    }
-
-    void FireFromDelay()
-    {
-        // Delay geldiğinde hedef kaçmış olabilir
-        if (currentTarget != null)
-            FireAt(currentTarget);
-
-        isCasting = false;
-    }
-
-    /// <summary>
-    /// Animation Event veya Relay tarafından çağrılır.
-    /// Cast anim klibinde AnimEvent_Fire event'i bu fonksiyona bağlanmalı.
-    /// </summary>
-    public void AnimEvent_Fire()
-    {
-        if (!useAnimationEvent)
-            return; // yanlışlıkla iki kez ateşlemeyi engeller
-
-        if (currentTarget != null)
-            FireAt(currentTarget);
-
-        isCasting = false;
-    }
-
-    void FireAt(Transform target)
-    {
-        if (projectilePrefab == null || castPoint == null || target == null)
-            return;
-
-        // Spawn pozisyonu: castPoint'in önüne ve yukarısına al (Base/Sato çarpışmasını azaltır)
-        Vector3 spawnPos = castPoint.position
-                         + castPoint.forward * spawnForwardOffset
-                         + castPoint.up * spawnUpOffset;
-
-        // Hedefin göğsüne doğru nişan al (Y sıfırlama yok)
-        Vector3 targetPos = target.position + Vector3.up * 1.0f;
-        Vector3 dir = targetPos - spawnPos;
-
-        if (dir.sqrMagnitude < 0.0001f)
-            dir = castPoint.forward;
-
-        Quaternion rot = Quaternion.LookRotation(dir.normalized, Vector3.up);
-
-        Debug.Log($"[Mage] FireAt! target={target.name} spawnPos={spawnPos} dir={dir.normalized}");
-
-        // Instantiate
-        PlayerMageProjectile proj = Instantiate(projectilePrefab, spawnPos, rot);
-
-        // Init: owner çarpışmasını ignore eden sistem + hasar parametreleri
-        proj.Init(
-            owner: transform,
-            speed: projectileSpeed,
-            baseDamage: damage,
-            radius: explosionRadius,
-            enemyMask: enemyMask,
-            enemyTag: enemyTag,
-            edgeMultiplier: edgeDamageMultiplier
-        );
-    }
-
-    Transform FindClosestEnemyInRange()
-    {
-        Collider[] hits = Physics.OverlapSphere(
-            transform.position,
-            attackRange,
-            enemyMask,
-            QueryTriggerInteraction.Ignore
-        );
-
-        Transform best = null;
-        float bestDist = float.MaxValue;
-
-        for (int i = 0; i < hits.Length; i++)
         {
-            if (hits[i] == null) continue;
-            if (!hits[i].CompareTag(enemyTag)) continue;
+            CancelInvoke(nameof(FireNow));
+            Invoke(nameof(FireNow), castDelay);
+        }
 
-            float d = (hits[i].transform.position - transform.position).sqrMagnitude;
-            if (d < bestDist)
+        CancelInvoke(nameof(EndCastWindow));
+        Invoke(nameof(EndCastWindow), Mathf.Max(0.05f, castWindow));
+    }
+
+    public void AnimEvent_Fire() => FireNow();
+    public void AnimEvent_EndCast() => EndCastWindow();
+
+    private void EndCastWindow()
+    {
+        _isCasting = false;
+        if (!lockTargetDuringAttack) _target = null;
+    }
+
+    private void FireNow()
+    {
+        // ✅ cast sırasında hedef öldüyse fire iptal
+        CleanupDeadTarget();
+        if (_target == null) return;
+
+        if (projectilePrefab == null || castPoint == null) return;
+
+        PlayerMageProjectile proj = Instantiate(projectilePrefab, castPoint.position, Quaternion.identity);
+
+        Vector3 dir = (_target.position - castPoint.position);
+        dir.y = 0f;
+        if (dir.sqrMagnitude < 0.001f) dir = castPoint.forward;
+
+        proj.transform.rotation = Quaternion.LookRotation(dir.normalized, Vector3.up);
+
+        proj.speed = projectileSpeed;
+        proj.baseDamage = GetFinalDamage();
+        proj.radius = explosionRadius;
+    }
+
+    private Transform AcquireTarget()
+    {
+        Vector3 center = rotateRoot.position;
+        int count = Physics.OverlapSphereNonAlloc(center, acquireRange, _overlaps, enemyMask, QueryTriggerInteraction.Ignore);
+
+        float best = float.MaxValue;
+        Transform bestT = null;
+
+        for (int i = 0; i < count; i++)
+        {
+            Collider c = _overlaps[i];
+            if (!c) continue;
+
+            Transform t = c.transform;
+            Transform enemyRoot = t.CompareTag(enemyTag) ? t : (t.parent != null && t.parent.CompareTag(enemyTag) ? t.parent : null);
+            if (enemyRoot == null) continue;
+
+            Health h = enemyRoot.GetComponentInParent<Health>();
+            if (h == null || h.currentHealth <= 0) continue;
+
+            float d = (enemyRoot.position - center).sqrMagnitude;
+            if (d < best)
             {
-                bestDist = d;
-                best = hits[i].transform;
+                best = d;
+                bestT = enemyRoot;
             }
         }
 
-        return best;
+        return bestT;
     }
 
-    void RotateTowards(Vector3 worldPos)
+    private void RotateToward(Transform target, float speed, float snapThresholdDeg)
     {
-        Vector3 flatDir = worldPos - transform.position;
-        flatDir.y = 0f;
-        if (flatDir.sqrMagnitude < 0.0001f) return;
+        Vector3 dir = target.position - rotateRoot.position;
+        dir.y = 0f;
+        if (dir.sqrMagnitude < 0.0001f) return;
 
-        Quaternion targetRot = Quaternion.LookRotation(flatDir.normalized, Vector3.up);
-        transform.rotation = Quaternion.Slerp(transform.rotation, targetRot, rotateSpeed * Time.deltaTime);
+        Quaternion desired = Quaternion.LookRotation(dir.normalized, Vector3.up);
+
+        if (snapThresholdDeg > 0f)
+        {
+            float angle = Quaternion.Angle(rotateRoot.rotation, desired);
+            if (angle >= snapThresholdDeg)
+            {
+                rotateRoot.rotation = desired;
+                return;
+            }
+        }
+
+        rotateRoot.rotation = Quaternion.Slerp(rotateRoot.rotation, desired, speed * Time.deltaTime);
     }
 
-#if UNITY_EDITOR
-    void OnDrawGizmosSelected()
+    private int GetFinalDamage()
     {
-        Gizmos.color = Color.cyan;
-        Gizmos.DrawWireSphere(transform.position, attackRange);
+        float mult = 1f;
+        if (globalStats != null) mult += globalStats.globalDamageMultiplier;
+        return Mathf.Max(1, Mathf.RoundToInt(baseDamage * mult));
     }
-#endif
+
+    private void OnDrawGizmosSelected()
+    {
+        if (!drawDebug) return;
+        Gizmos.color = Color.yellow;
+        Gizmos.DrawWireSphere(transform.position, acquireRange);
+    }
 }
-    

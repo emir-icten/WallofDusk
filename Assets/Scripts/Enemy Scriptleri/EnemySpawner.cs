@@ -1,286 +1,331 @@
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
 public class EnemySpawner : MonoBehaviour
 {
-    [Header("Spawn Ayarları")]
-    public GameObject enemyPrefab;              // Düşman prefabı
+    public static EnemySpawner Instance { get; private set; }
 
-    [Tooltip("Aynı anda sahnede bulunabilecek maksimum canlı düşman sayısı (1. gece için)")]
-    public int maxAliveEnemies = 30;
+    [Header("--- Temel Ayarlar ---")]
+    public GameObject enemyPrefab;
+    [Tooltip("Düşmanların doğacağı alan (Tercihen Box Collider)")]
+    public Collider spawnArea;
+    [Tooltip("Raycast'in çarpacağı zemin katmanı")]
+    public LayerMask groundLayer = ~0; 
 
-    [Tooltip("Bir gece boyunca toplam kaç düşman spawn edilsin (1. gece için, 0 = sınırsız)")]
-    public int maxSpawnPerNight = 100;
+    [Header("--- Referanslar ---")]
+    public Transform baseTransform;
+    public Transform playerTransform;
 
-    [Header("Spawn Alanı (Plane / Ground)")]
-    [Tooltip("Düşmanların rastgele spawn olacağı plane / ground collider")]
-    public Collider spawnArea;                  // Zemin collider'ı
+    [Header("--- Mesafe Kısıtlamaları ---")]
+    public float minDistanceFromBase = 15f;
+    public float minDistanceFromPlayer = 12f;
 
-    [Header("Mesafe Ayarları")]
-    public Transform baseTransform;             // Base binası
-    public Transform playerTransform;           // Oyuncu
-    public float minDistanceFromBase = 15f;     // Base'e en az bu kadar uzak
-    public float minDistanceFromPlayer = 5f;    // Oyuncuya da çok yapışmasın
+    [Header("--- Spawn Zamanlaması ---")]
+    public float spawnInterval = 1.0f; // Temel bekleme süresi
+    [Tooltip("Gece ilerledikçe spawn ne kadar hızlansın? (0 ile 1 arası eğri)")]
+    public AnimationCurve nightIntensityCurve = AnimationCurve.Linear(0, 0, 1, 1);
 
-    [Header("Gündüz/Gece Kontrol")]
-    [Tooltip("Sadece geceleri spawn olsun mu?")]
-    public bool spawnOnlyAtNight = true;
+    [Header("--- Zorluk ve Limitler (1. Gece) ---")]
+    public int baseMaxAlive = 25;       // Aynı anda sahnede olabilecek max düşman
+    public int baseTotalPerNight = 90;  // O gece toplam doğacak düşman
+    
+    [Header("--- Gece Zorluk Artışı (Çarpanlar) ---")]
+    [Tooltip("Her gece spawn sayısı ve limitler % kaç artsın? (0.2 = %20)")]
+    public float difficultyGrowthFactor = 0.2f; 
+    public float hpGrowth = 0.15f;
+    public float dmgGrowth = 0.10f;
+    public float speedGrowth = 0.05f;
 
-    [Header("Gece Spawn Eğrisi")]
-    [Tooltip("Gece boyunca sürekli spawn olsun mu? (Half-sin eğrisi)")]
-    public bool useNightCurveSpawn = true;
+    [Header("--- Üst Limitler (Cap) ---")]
+    public int capMaxAlive = 150;
+    public int capTotalPerNight = 800;
+    public float capStatMultiplier = 10f; // Can/Hasar max 10 katına çıkabilir
 
-    [Tooltip("Gece başı/sonu (en sakin anlarda) efektif interval (saniye)")]
-    public float maxSpawnInterval = 5f;
+    [Header("--- Özel Etkinlikler ---")]
+    public bool useBloodMoon = true;
+    public int bloodMoonFrequency = 5; // 5 gecede bir
+    [Range(0f, 1f)] public float burstSpawnChance = 0.15f; // %15 ihtimalle sürü doğar
 
-    [Tooltip("Gecenin ortasında (en yoğun anda) efektif interval (saniye)")]
-    public float minSpawnInterval = 1f;
+    [Header("--- Temizlik ---")]
+    public bool burnEnemiesAtSunrise = true;
 
-    [Header("Zorluk / Gece İlerlemesi")]
-    [Tooltip("Her yeni gecede spawn miktarını çarpmak için kullanılan katsayı (1 = sabit zorluk)")]
-    public float nightSpawnMultiplier = 1.25f;   // her gece %25 daha fazla düşman
-
-    private readonly List<GameObject> aliveEnemies = new List<GameObject>();
-
-    // Rate mantığı için sayaç
-    private float spawnAccumulator = 0f;
-
-    // gece-gündüz geçiş takibi
-    private bool lastIsNight = false;
-
-    // gecelerde artan değerler için (1. gece temel)
-    private int baseMaxAliveEnemies;
-    private int baseMaxSpawnPerNight;
-
-    // Kaçıncı gecedeyiz?
+    // --- State Variables ---
+    private List<GameObject> activeEnemies = new List<GameObject>();
+    private Coroutine spawnCoroutine;
+    
     private int currentNight = 0;
-    public int CurrentNight => currentNight;   // NightsSurvivedText buradan okuyor
+    // DÜZELTME: Bu satır eksikti, diğer scriptlerin erişmesi için eklendi:
+    public int CurrentNight => currentNight; 
+
+    private int enemiesSpawnedTonight = 0;
+    
+    // O anki gecenin hesaplanmış limitleri
+    private int currentMaxAlive;
+    private int currentMaxTotal;
+    private bool isBloodMoonActive = false;
+
+    // Prefab'in saf değerleri
+    private float rawHp, rawDmg, rawSpeed;
+
+    private void Awake()
+    {
+        // Singleton Pattern
+        if (Instance != null && Instance != this) { Destroy(gameObject); return; }
+        Instance = this;
+
+        CacheBaseStats();
+    }
+
+    private void OnEnable()
+    {
+        if (TimeManager.Instance != null)
+        {
+            TimeManager.Instance.OnNightStart += StartNightRoutine;
+            TimeManager.Instance.OnDayStart += StopNightRoutine;
+        }
+    }
+
+    private void OnDisable()
+    {
+        if (TimeManager.Instance != null)
+        {
+            TimeManager.Instance.OnNightStart -= StartNightRoutine;
+            TimeManager.Instance.OnDayStart -= StopNightRoutine;
+        }
+    }
 
     private void Start()
     {
-        baseMaxAliveEnemies = maxAliveEnemies;
-        baseMaxSpawnPerNight = maxSpawnPerNight;
+        // Oyun başladığında zaten geceyse manuel başlat
+        if (TimeManager.Instance != null && !TimeManager.Instance.IsDay)
+        {
+            StartNightRoutine();
+        }
     }
 
-    private void Update()
+    // --- Gece Döngüsü Başlatma ---
+    private void StartNightRoutine()
     {
-        if (enemyPrefab == null || spawnArea == null)
-            return;
+        currentNight++;
+        enemiesSpawnedTonight = 0;
+        
+        // Liste temizliği (Ölüleri listeden at)
+        activeEnemies.RemoveAll(x => x == null);
 
-        bool isNight = true;
+        // Zorluk Hesapla
+        CalculateNightStats();
 
-        if (TimeManager.Instance != null && spawnOnlyAtNight)
+        // Varsa eski coroutine'i durdur, yenisini başlat
+        if (spawnCoroutine != null) StopCoroutine(spawnCoroutine);
+        spawnCoroutine = StartCoroutine(SpawnLoop());
+
+        string msg = $"[EnemySpawner] Gece {currentNight} Başladı. Hedef: {currentMaxTotal} Düşman.";
+        if (isBloodMoonActive) msg += " <color=red>!!! KANLI AY !!!</color>";
+        Debug.Log(msg);
+    }
+
+    // --- Geceyi Bitirme ---
+    private void StopNightRoutine()
+    {
+        if (spawnCoroutine != null) StopCoroutine(spawnCoroutine);
+        
+        Debug.Log("[EnemySpawner] Gündüz oldu. Spawn durduruldu.");
+
+        if (burnEnemiesAtSunrise)
         {
-            isNight = !TimeManager.Instance.IsDay;
-        }
-
-        // Gece / gündüz geçişlerini takip et
-        if (TimeManager.Instance != null)
-        {
-            if (isNight && !lastIsNight)
-            {
-                // === GECE BAŞLADI ===
-                currentNight++;
-                Debug.Log("Gece başladı. Gece numarası = " + currentNight);
-
-                // Her gece zorluk artışı (alive / total spawn)
-                float mult = Mathf.Pow(nightSpawnMultiplier, currentNight - 1);
-
-                maxAliveEnemies = Mathf.Max(1, Mathf.RoundToInt(baseMaxAliveEnemies * mult));
-
-                if (baseMaxSpawnPerNight <= 0)
-                    maxSpawnPerNight = 0; // 0 = sınırsız
-                else
-                    maxSpawnPerNight = Mathf.Max(1, Mathf.RoundToInt(baseMaxSpawnPerNight * mult));
-
-                spawnedThisNight = 0;
-                spawnAccumulator = 0f;
-            }
-
-            if (!isNight && lastIsNight)
-            {
-                // === GÜNDÜZ BAŞLADI ===
-                Debug.Log("Gündüz başladı. Düşmanlar güneşte yanacak.");
-
-                // Gündüz başlarken düşmanları yak
-                BurnAllAliveEnemies();
-            }
-        }
-
-        lastIsNight = isNight;
-
-        // Canlı listesinde null temizle
-        for (int i = aliveEnemies.Count - 1; i >= 0; i--)
-        {
-            if (aliveEnemies[i] == null) aliveEnemies.RemoveAt(i);
-        }
-
-        // Sadece geceleri spawn
-        if (spawnOnlyAtNight && !isNight)
-            return;
-
-        // gece değilse çık
-        if (spawnOnlyAtNight && TimeManager.Instance != null && TimeManager.Instance.IsDay)
-            return;
-
-        // alive limit
-        if (aliveEnemies.Count >= maxAliveEnemies)
-            return;
-
-        // toplam spawn limiti (0 = sınırsız)
-        if (maxSpawnPerNight > 0 && spawnedThisNight >= maxSpawnPerNight)
-            return;
-
-        float nightProgress = GetNightProgress(); // 0..1
-
-        float curve = 1f;
-        if (useNightCurveSpawn)
-        {
-            // half-sin: 0->1->0
-            curve = Mathf.Sin(nightProgress * Mathf.PI);
-        }
-
-        float edgeRate = 1f / Mathf.Max(0.001f, maxSpawnInterval);
-        float peakRate = 1f / Mathf.Max(0.001f, minSpawnInterval);
-
-        float spawnRatePerSecond = Mathf.Lerp(edgeRate, peakRate, curve);
-
-        spawnAccumulator += spawnRatePerSecond * Time.deltaTime;
-
-        while (spawnAccumulator >= 1f)
-        {
-            spawnAccumulator -= 1f;
-
-            // tekrar limit kontrol
-            if (aliveEnemies.Count >= maxAliveEnemies) break;
-            if (maxSpawnPerNight > 0 && spawnedThisNight >= maxSpawnPerNight) break;
-
-            if (TrySpawnOne())
-            {
-                spawnedThisNight++;
-            }
+            BurnAllEnemies();
         }
     }
 
-    private int spawnedThisNight = 0;
+    // --- ANA SPAWN DÖNGÜSÜ (Coroutine) ---
+    private IEnumerator SpawnLoop()
+    {
+        // İlk başta kısa bir gecikme
+        yield return new WaitForSeconds(1f);
+
+        while (true)
+        {
+            // 1. Limit Kontrolü
+            if (enemiesSpawnedTonight >= currentMaxTotal || activeEnemies.Count >= currentMaxAlive)
+            {
+                yield return new WaitForSeconds(0.5f);
+                activeEnemies.RemoveAll(x => x == null || !x.activeInHierarchy);
+                continue; 
+            }
+
+            // 2. Gece Yoğunluk Eğrisi
+            float waitTime = spawnInterval;
+            if (TimeManager.Instance != null)
+            {
+                float progress = GetNightProgress();
+                float intensity = nightIntensityCurve.Evaluate(progress);
+                waitTime = Mathf.Lerp(spawnInterval, spawnInterval * 0.3f, intensity);
+            }
+
+            if (isBloodMoonActive) waitTime *= 0.5f;
+
+            // 3. Sürü (Burst) Kontrolü
+            int countToSpawn = 1;
+            if (Random.value < burstSpawnChance)
+            {
+                countToSpawn = Random.Range(2, 4); 
+            }
+
+            // 4. Spawn İşlemi
+            for (int i = 0; i < countToSpawn; i++)
+            {
+                if (enemiesSpawnedTonight >= currentMaxTotal) break;
+                if (activeEnemies.Count >= currentMaxAlive) break;
+
+                TrySpawnEnemy();
+                yield return new WaitForSeconds(0.1f);
+            }
+
+            yield return new WaitForSeconds(waitTime);
+        }
+    }
+
+    private void TrySpawnEnemy()
+    {
+        Vector3 spawnPos;
+        if (!FindValidSpawnPosition(out spawnPos)) return;
+
+        GameObject newEnemy;
+
+        if (PoolManager.Instance != null)
+        {
+            newEnemy = PoolManager.Instance.Spawn(enemyPrefab, spawnPos, Quaternion.identity);
+        }
+        else
+        {
+            newEnemy = Instantiate(enemyPrefab, spawnPos, Quaternion.identity);
+        }
+
+        if (newEnemy != null)
+        {
+            ApplyStats(newEnemy);
+            activeEnemies.Add(newEnemy);
+            enemiesSpawnedTonight++;
+        }
+    }
+
+    // --- Yardımcı: Pozisyon Bulma ---
+    private bool FindValidSpawnPosition(out Vector3 result)
+    {
+        result = Vector3.zero;
+        if (spawnArea == null) return false;
+
+        Bounds b = spawnArea.bounds;
+
+        for (int i = 0; i < 15; i++)
+        {
+            float x = Random.Range(b.min.x, b.max.x);
+            float z = Random.Range(b.min.z, b.max.z);
+            
+            Vector3 origin = new Vector3(x, b.max.y + 100f, z);
+
+            if (Physics.Raycast(origin, Vector3.down, out RaycastHit hit, 200f, groundLayer))
+            {
+                Vector3 candidate = hit.point;
+
+                bool safeFromBase = baseTransform == null || Vector3.Distance(candidate, baseTransform.position) >= minDistanceFromBase;
+                bool safeFromPlayer = playerTransform == null || Vector3.Distance(candidate, playerTransform.position) >= minDistanceFromPlayer;
+
+                if (safeFromBase && safeFromPlayer)
+                {
+                    result = candidate;
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    // --- Zorluk Hesaplama Sistemi ---
+    private void CalculateNightStats()
+    {
+        isBloodMoonActive = useBloodMoon && (currentNight > 0) && (currentNight % bloodMoonFrequency == 0);
+
+        float multiplier = Mathf.Pow(1f + difficultyGrowthFactor, currentNight - 1);
+        float limitMultiplier = isBloodMoonActive ? 1.5f : 1.0f;
+
+        currentMaxAlive = Mathf.Clamp(Mathf.RoundToInt(baseMaxAlive * multiplier * limitMultiplier), 1, capMaxAlive);
+        currentMaxTotal = Mathf.Clamp(Mathf.RoundToInt(baseTotalPerNight * multiplier * limitMultiplier), 1, capTotalPerNight);
+    }
+
+    private void ApplyStats(GameObject enemy)
+    {
+        float multiplier = Mathf.Pow(1f + difficultyGrowthFactor, currentNight - 1);
+        float moonMult = isBloodMoonActive ? 1.3f : 1.0f; 
+
+        int finalHp = Mathf.RoundToInt(rawHp * (1 + (hpGrowth * (currentNight - 1))) * moonMult);
+        int finalDmg = Mathf.RoundToInt(rawDmg * (1 + (dmgGrowth * (currentNight - 1))) * moonMult);
+        float finalSpeed = rawSpeed * (1 + (speedGrowth * (currentNight - 1)));
+        if (isBloodMoonActive) finalSpeed *= 1.1f;
+
+        finalHp = Mathf.Min(finalHp, Mathf.RoundToInt(rawHp * capStatMultiplier));
+        finalDmg = Mathf.Min(finalDmg, Mathf.RoundToInt(rawDmg * capStatMultiplier));
+
+        if (enemy.TryGetComponent(out Health h))
+        {
+            h.maxHealth = finalHp;
+            h.currentHealth = finalHp;
+        }
+
+        if (enemy.TryGetComponent(out EnemyAI ai))
+        {
+            ai.attackDamage = finalDmg;
+            ai.moveSpeed = finalSpeed;
+            if (ai.baseTarget == null) ai.baseTarget = baseTransform;
+        }
+    }
+
+    private void BurnAllEnemies()
+    {
+        for (int i = activeEnemies.Count - 1; i >= 0; i--)
+        {
+            if (activeEnemies[i] != null)
+            {
+                if (activeEnemies[i].TryGetComponent(out EnemySunBurn burner))
+                {
+                    burner.StartBurning();
+                }
+                else
+                {
+                    if (PoolManager.Instance != null) PoolManager.Instance.Despawn(activeEnemies[i]);
+                    else Destroy(activeEnemies[i]);
+                }
+            }
+        }
+        activeEnemies.Clear();
+    }
+
+    private void CacheBaseStats()
+    {
+        if (enemyPrefab == null) return;
+        if (enemyPrefab.TryGetComponent(out Health h)) rawHp = h.maxHealth;
+        if (enemyPrefab.TryGetComponent(out EnemyAI ai))
+        {
+            rawDmg = ai.attackDamage;
+            rawSpeed = ai.moveSpeed;
+        }
+    }
 
     private float GetNightProgress()
     {
-        if (TimeManager.Instance == null)
-            return 0f;
+        if (TimeManager.Instance == null) return 0f;
+        
+        float current = TimeManager.Instance.currentTime;
+        float start = TimeManager.Instance.dayStartHour; 
+        float end = TimeManager.Instance.dayEndHour;     
 
-        // TimeManager senin projende currentTime tutuyor
-        float t = TimeManager.Instance.currentTime;
-        float dayStart = TimeManager.Instance.dayStartHour;
-        float dayEnd = TimeManager.Instance.dayEndHour;
+        float nightLength = (24f - end) + start;
+        float timePassed = 0f;
 
-        // gece uzunluğu: (24 - dayEnd) + dayStart
-        float nightLength = (24f - dayEnd) + dayStart;
+        if (current >= end) timePassed = current - end;
+        else timePassed = (24f - end) + current;
 
-        float timeSinceNightStart;
-
-        if (t >= dayEnd)
-            timeSinceNightStart = t - dayEnd;
-        else
-            timeSinceNightStart = (24f - dayEnd) + t;
-
-        return Mathf.Clamp01(timeSinceNightStart / Mathf.Max(0.0001f, nightLength));
-    }
-
-    private bool TrySpawnOne()
-    {
-        Vector3 spawnPos;
-        int safety = 0;
-
-        do
-        {
-            spawnPos = GetRandomPointOnPlane();
-            safety++;
-            if (safety > 40)
-                return false;
-        }
-        while (!IsValidSpawnPosition(spawnPos));
-
-        // ✅ Pooling: Instantiate yerine Spawn
-        GameObject enemy =
-            (PoolManager.Instance != null)
-                ? PoolManager.Instance.Spawn(enemyPrefab, spawnPos, Quaternion.identity)
-                : Instantiate(enemyPrefab, spawnPos, Quaternion.identity);
-
-        aliveEnemies.Add(enemy);
-
-        // EnemyAI varsa base hedefi ver
-        EnemyAI ai = enemy.GetComponent<EnemyAI>();
-        if (ai != null && baseTransform != null)
-        {
-            ai.baseTarget = baseTransform;
-        }
-
-        return true;
-    }
-
-    private Vector3 GetRandomPointOnPlane()
-    {
-        Bounds b = spawnArea.bounds;
-
-        float x = Random.Range(b.min.x, b.max.x);
-        float z = Random.Range(b.min.z, b.max.z);
-
-        // y = üstten ray atıp zemine oturtma
-        float y = b.max.y + 2f;
-        Vector3 pos = new Vector3(x, y, z);
-
-        // zemin üzerine indir
-        if (Physics.Raycast(pos, Vector3.down, out RaycastHit hit, 50f))
-        {
-            pos.y = hit.point.y;
-        }
-
-        return pos;
-    }
-
-    private bool IsValidSpawnPosition(Vector3 pos)
-    {
-        if (baseTransform != null)
-        {
-            Vector2 p2 = new Vector2(pos.x, pos.z);
-            Vector2 b2 = new Vector2(baseTransform.position.x, baseTransform.position.z);
-            if (Vector2.Distance(p2, b2) < minDistanceFromBase)
-                return false;
-        }
-
-        if (playerTransform != null)
-        {
-            Vector2 p2 = new Vector2(pos.x, pos.z);
-            Vector2 pl2 = new Vector2(playerTransform.position.x, playerTransform.position.z);
-            if (Vector2.Distance(p2, pl2) < minDistanceFromPlayer)
-                return false;
-        }
-
-        return true;
-    }
-
-    private void BurnAllAliveEnemies()
-    {
-        foreach (GameObject enemy in aliveEnemies)
-        {
-            if (enemy == null) continue;
-
-            EnemySunBurn burn = enemy.GetComponent<EnemySunBurn>();
-            if (burn != null)
-            {
-                burn.StartBurning();
-            }
-            else
-            {
-                // Script yoksa: pooled ise despawn, değilse destroy
-                if (PoolManager.Instance != null && enemy.GetComponent<PooledObject>() != null)
-                    PoolManager.Instance.Despawn(enemy);
-                else
-                    Destroy(enemy);
-            }
-        }
-
-        aliveEnemies.Clear();
+        return Mathf.Clamp01(timePassed / nightLength);
     }
 }
